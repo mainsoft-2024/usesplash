@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useCallback, useEffect, useRef, useState } from "react"
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { UIMessage } from "ai"
 import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
@@ -18,17 +18,20 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
   const logos = trpc.logo.listByProject.useQuery({ projectId })
   const chatMessages = trpc.chat.listByProject.useQuery({ projectId })
 
-  const initialMessages: UIMessage[] = (chatMessages.data ?? []).map((msg) => ({
-    id: msg.id,
-    role: msg.role === "assistant" ? "assistant" : "user",
-    content: msg.content,
-    parts: [{ type: "text", text: msg.content }],
-    createdAt: new Date(msg.createdAt),
-  }))
+  // Memoize initial messages to avoid recreating on every render
+  const initialMessages = useMemo<UIMessage[]>(() => {
+    if (!chatMessages.data) return []
+    return chatMessages.data.map((msg) => ({
+      id: msg.id,
+      role: msg.role as "user" | "assistant",
+      parts: [{ type: "text" as const, text: msg.content }],
+      createdAt: new Date(msg.createdAt),
+    }))
+  }, [chatMessages.data])
 
   const chat = useProjectChat(
     projectId,
-    chatMessages.isSuccess ? initialMessages : undefined,
+    chatMessages.isSuccess && initialMessages.length > 0 ? initialMessages : undefined,
   )
 
   const handleMouseDown = useCallback(() => { dragging.current = true }, [])
