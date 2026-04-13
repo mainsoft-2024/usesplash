@@ -73,3 +73,57 @@ html { scroll-behavior: smooth; }
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Chat markdown: inline vs fenced code (react-markdown nests block code in <pre><code>) */
+.chat-md pre.chat-md-pre code.chat-md-code {
+  display: block;
+  white-space: pre;
+  background: transparent;
+  padding: 0;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: inherit;
+}
+
+.chat-md :not(pre) > code.chat-md-code {
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.375rem;
+  background: var(--bg-deep);
+  color: #d0d0d0;
+  box-shadow: 0 0 0 1px var(--border-primary);
+}
+
+/* Gallery: logo being edited by AI — motion cues for “work in progress” */
+@keyframes gallery-edit-shimmer {
+  0% {
+    transform: translateX(-130%) skewX(-14deg);
+  }
+  100% {
+    transform: translateX(130%) skewX(-14deg);
+  }
+}
+
+@keyframes gallery-edit-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+@keyframes gallery-edit-border-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+    filter: drop-shadow(0 0 6px rgba(255, 183, 77, 0.25));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px rgba(255, 183, 77, 0.45));
+  }
+}
+
+.gallery-card-editing {
+  animation: gallery-edit-border-pulse 1.8s ease-in-out infinite;
+}
