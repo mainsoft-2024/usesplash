@@ -35,6 +35,10 @@ export function parseInitialMessages(messages: ChatMessage[] | undefined): UIMes
         return [{ type: "text" as const, text: stored.text }]
       }
 
+      if (stored.type === "file" && typeof stored.mediaType === "string") {
+        return [{ type: "file" as any, mediaType: stored.mediaType, url: stored.url, data: stored.data } as any]
+      }
+
       const hasValidToolShape =
         typeof stored.type === "string" &&
         stored.type.startsWith("tool-") &&

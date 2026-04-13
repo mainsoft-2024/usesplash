@@ -56,12 +56,15 @@ export async function POST(req: Request) {
       .join("\n")
       .trim()
 
-    if (userText) {
+    const hasFileParts = lastUserMsg.parts?.some((p: any) => p.type === "file")
+
+    if (userText || hasFileParts) {
       await prisma.chatMessage.create({
         data: {
           projectId,
           role: "user",
-          content: userText,
+          content: userText || "(이미지 첨부)",
+          parts: hasFileParts ? JSON.parse(JSON.stringify(lastUserMsg.parts)) : undefined,
         },
       })
     }

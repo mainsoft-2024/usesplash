@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useState, useMemo } from "react"
+import { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import type { UIMessage } from "ai"
 import type { useProjectChat } from "@/lib/chat/hooks"
 import { PulseSpinner, WaveSpinner } from "@/components/spinners"
@@ -30,8 +30,8 @@ function getToolData(part: unknown) {
 
 type Segment =
   | { kind: "text"; content: string }
+  | { kind: "image"; url: string; mediaType: string }
   | { kind: "tool"; part: NonNullable<UIMessage["parts"]>[number]; index: number }
-
 function buildSegments(parts: UIMessage["parts"]): Segment[] {
   if (!parts?.length) return []
 
@@ -50,10 +50,18 @@ function buildSegments(parts: UIMessage["parts"]): Segment[] {
       textBuf += part.text
       return
     }
+    if (part.type === "file") {
+      flushText()
+      segments.push({
+        kind: "image",
+        url: ((part as any).url || (part as any).data) as string,
+        mediaType: (part as any).mediaType as string,
+      })
+      return
+    }
     flushText()
     segments.push({ kind: "tool", part, index })
   })
-
   flushText()
   return segments
 }
@@ -63,6 +71,112 @@ export function ChatPanel({ chat }: ChatProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [isFocused, setIsFocused] = useState(false)
 
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const previewUrlMapRef = useRef(new Map<File, string>())
+  const MAX_FILE_SIZE = 4 * 1024 * 1024
+  const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"]
+
+  useEffect(() => {
+    return () => {
+      previewUrlMapRef.current.forEach((url) => URL.revokeObjectURL(url))
+      previewUrlMapRef.current.clear()
+    }
+  }, [])
+
+  const getPreviewUrl = useCallback((file: File) => {
+    const existing = previewUrlMapRef.current.get(file)
+    if (existing) return existing
+    const next = URL.createObjectURL(file)
+    previewUrlMapRef.current.set(file, next)
+    return next
+  }, [])
+
+  const convertFilesToDataURLParts = useCallback(async (files: File[]) => {
+    const parts = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise<{ type: "file"; mediaType: string; url: string }>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve({ type: "file", mediaType: file.type, url: String(reader.result) })
+            reader.onerror = () => reject(new Error("파일 변환에 실패했습니다"))
+            reader.readAsDataURL(file)
+          })
+      )
+    )
+    return parts
+  }, [])
+
+  const removeFile = useCallback((index: number) => {
+    setAttachedFiles((prev) => {
+      const target = prev[index]
+      if (target) {
+        const previewUrl = previewUrlMapRef.current.get(target)
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl)
+          previewUrlMapRef.current.delete(target)
+        }
+      }
+      return prev.filter((_, i) => i !== index)
+    })
+  }, [])
+
+  const clearAttachedFiles = useCallback(() => {
+    attachedFiles.forEach((file) => {
+      const previewUrl = previewUrlMapRef.current.get(file)
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl)
+        previewUrlMapRef.current.delete(file)
+      }
+    })
+    setAttachedFiles([])
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }, [attachedFiles])
+
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    if (!files.length) return
+
+    const validFiles: File[] = []
+    files.forEach((file) => {
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        alert("PNG, JPG, WEBP 파일만 첨부할 수 있어요.")
+        return
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        alert("이미지당 최대 4MB까지 첨부할 수 있어요.")
+        return
+      }
+      validFiles.push(file)
+    })
+
+    if (validFiles.length > 0) {
+      setAttachedFiles((prev) => [...prev, ...validFiles])
+    }
+    event.target.value = ""
+  }, [ACCEPTED_TYPES, MAX_FILE_SIZE])
+
+  const submitMessage = useCallback(async () => {
+    if (chat.isLoading) return
+
+    const content = chat.input.trim()
+    const hasFiles = attachedFiles.length > 0
+    if (!content && !hasFiles) return
+
+    const fileParts = hasFiles ? await convertFilesToDataURLParts(attachedFiles) : undefined
+    chat.sendMessage(content, fileParts)
+    chat.setInput("")
+    if (inputRef.current) inputRef.current.style.height = "auto"
+    clearAttachedFiles()
+  }, [attachedFiles, chat, clearAttachedFiles, convertFilesToDataURLParts])
+
+  const handleFormSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      void submitMessage()
+    },
+    [submitMessage]
+  )
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chat.messages])
@@ -214,6 +328,9 @@ export function ChatPanel({ chat }: ChatProps) {
                         if (seg.kind === "text") {
                           return <ChatMarkdown key={`t-${si}`} content={seg.content} />
                         }
+                        if (seg.kind === "image") {
+                          return <img key={`img-${si}`} src={seg.url} alt="첨부 이미지" className="mt-2 max-h-64 max-w-xs rounded-lg border border-[var(--border-primary)]" />
+                        }
                         return renderToolPart(seg, `tool-${seg.index}-${si}`)
                       })
                     )}
@@ -245,10 +362,43 @@ export function ChatPanel({ chat }: ChatProps) {
         <div ref={endRef} className="h-px shrink-0" aria-hidden />
       </div>
 
-      <form onSubmit={chat.handleSubmit} className="shrink-0 border-t border-[var(--divider)] bg-[var(--bg-primary)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/png,image/jpeg,image/webp"
+        multiple
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      <form onSubmit={handleFormSubmit} className="shrink-0 border-t border-[var(--divider)] bg-[var(--bg-primary)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
         <div className={`${THREAD}`}>
           <div className="rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-1.5 shadow-[0_0_0_1px_rgb(0_0_0/0.02)] transition-shadow focus-within:border-[var(--accent-green)]/35 focus-within:ring-2 focus-within:ring-[var(--accent-green)]/20">
+            {attachedFiles.length > 0 && (
+              <div className="mb-2 flex gap-2 overflow-x-auto px-1">
+                {attachedFiles.map((file, index) => (
+                  <div key={`${file.name}-${file.lastModified}-${index}`} className="relative h-12 w-12 shrink-0">
+                    <img src={getPreviewUrl(file)} alt={file.name} className="h-12 w-12 rounded-md border border-[var(--border-primary)] object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--bg-primary)] text-[10px] text-[var(--text-secondary)] ring-1 ring-[var(--border-primary)] hover:text-[var(--text-primary)]"
+                      aria-label="첨부 이미지 제거"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-dim)] transition-colors hover:text-[var(--text-secondary)]"
+                aria-label="이미지 첨부"
+              >
+                📎
+              </button>
               <textarea
                 ref={inputRef}
                 value={chat.input}
@@ -263,8 +413,8 @@ export function ChatPanel({ chat }: ChatProps) {
                   if (e.nativeEvent.isComposing || ("isComposing" in e && e.isComposing)) return
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    if (chat.input.trim() && !chat.isLoading) {
-                      chat.handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>)
+                    if ((chat.input.trim() || attachedFiles.length > 0) && !chat.isLoading) {
+                      void submitMessage()
                     }
                   }
                 }}
@@ -283,7 +433,7 @@ export function ChatPanel({ chat }: ChatProps) {
               ) : (
                 <button
                   type="submit"
-                  disabled={!chat.input.trim()}
+                  disabled={!chat.input.trim() && attachedFiles.length === 0}
                   className="mb-0.5 h-9 shrink-0 rounded-xl bg-[var(--accent-green)] px-4 text-sm font-semibold text-black transition-colors hover:bg-[var(--accent-green-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   전송
