@@ -1,14 +1,15 @@
 "use client"
 
 import { useChat as useAIChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
+import { DefaultChatTransport, type UIMessage } from "ai"
 import { useCallback, useState } from "react"
 
-export function useProjectChat(projectId: string) {
+export function useProjectChat(projectId: string, initialMessages?: UIMessage[]) {
   const [input, setInput] = useState("")
 
   const chat = useAIChat({
     id: projectId,
+    messages: initialMessages,
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: { projectId },

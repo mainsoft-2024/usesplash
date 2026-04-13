@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const result = streamText({
+  const streamResult = streamText({
     model: openrouter.chat(DEFAULT_MODEL),
     system: systemPrompt,
     messages: await convertToModelMessages(messages),
@@ -204,5 +204,5 @@ export async function POST(req: Request) {
     },
   })
 
-  return result.toUIMessageStreamResponse()
+  return streamResult.toUIMessageStreamResponse()
 }

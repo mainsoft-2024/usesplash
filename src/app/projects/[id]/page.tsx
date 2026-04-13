@@ -1,6 +1,7 @@
 "use client"
 
 import { use, useCallback, useEffect, useRef, useState } from "react"
+import type { UIMessage } from "ai"
 import { trpc } from "@/lib/trpc/client"
 import { useProjectChat } from "@/lib/chat/hooks"
 import { ChatPanel } from "@/components/chat-panel"
@@ -13,7 +14,20 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
 
   const project = trpc.project.get.useQuery({ id: projectId })
   const logos = trpc.logo.listByProject.useQuery({ projectId })
-  const chat = useProjectChat(projectId)
+  const chatMessages = trpc.chat.listByProject.useQuery({ projectId })
+
+  const initialMessages: UIMessage[] = (chatMessages.data ?? []).map((msg) => ({
+    id: msg.id,
+    role: msg.role === "assistant" ? "assistant" : "user",
+    content: msg.content,
+    parts: [{ type: "text", text: msg.content }],
+    createdAt: new Date(msg.createdAt),
+  }))
+
+  const chat = useProjectChat(
+    projectId,
+    chatMessages.isSuccess ? initialMessages : undefined,
+  )
 
   const handleMouseDown = useCallback(() => { dragging.current = true }, [])
 
