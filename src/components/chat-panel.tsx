@@ -45,27 +45,60 @@ export function ChatPanel({ chat }: ChatProps) {
             }`}>
               {(() => {
                 const parts = msg.parts as Array<Record<string, unknown>> | undefined
-                if (parts && parts.length > 0) {
-                  return parts.map((part, i) => {
-                    if (part.type === "text") return <span key={i}>{part.text as string}</span>
-                    if (part.type === "tool-invocation") {
-                      const inv = part.toolInvocation as Record<string, unknown>
-                      const toolName = inv.toolName as string
-                      const state = inv.state as string
-                      if (state === "call") {
-                        return <div key={i} className="text-xs text-[#ffb74d] mt-2 flex items-center gap-2"><span className="animate-spin">⚙️</span>{toolName === "generate_batch" ? "로고 생성 중..." : "로고 편집 중..."}</div>
-                      }
-                      if (state === "result") {
-                        const result = inv.result as Record<string, unknown> | undefined
-                        if (toolName === "generate_batch") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ {String(result?.generated ?? 0)}개 로고 생성 완료</div>
-                        if (toolName === "edit_logo") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ 로고 #{String(result?.logoIndex)} v{String(result?.versionNumber)} 편집 완료</div>
-                      }
-                    }
-                    return null
-                  })
+                if (!parts || parts.length === 0) {
+                  return <span className="text-[#555]">...</span>
                 }
-                // Fallback: show streaming indicator if parts is empty
-                return <span className="text-[#555]">...</span>
+
+                return parts.map((part, i) => {
+                  if (part.type === "text") return <span key={i}>{String(part.text ?? "")}</span>
+                  if (part.type === "tool-invocation") {
+                    const inv = part.toolInvocation as Record<string, unknown>
+                    const toolName = inv.toolName as string
+                    const state = inv.state as string
+
+                    if (state === "call") {
+                      const args = inv.args as Record<string, unknown> | undefined
+                      const count = args?.count ?? 5
+                      return (
+                        <div key={i} className="mt-2 space-y-1.5">
+                          <div className="flex items-center gap-2 text-xs text-[#ffb74d]">
+                            <span className="inline-block w-3 h-3 border-2 border-[#ffb74d] border-t-transparent rounded-full animate-spin" />
+                            {toolName === "generate_batch" ? `로고 ${count}개 생성 중...` : "로고 편집 중..."}
+                          </div>
+                          {toolName === "generate_batch" && (
+                            <div className="flex gap-1">
+                              {Array.from({ length: Number(count) }, (_, j) => (
+                                <div
+                                  key={j}
+                                  className="w-8 h-8 rounded-lg bg-[#2a2a2a] animate-pulse"
+                                  style={{ animationDelay: `${j * 300}ms` }}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (state === "result") {
+                      const result = inv.result as Record<string, unknown> | undefined
+                      if (toolName === "generate_batch") {
+                        const generated = Number(result?.generated ?? 0)
+                        const total = Number(result?.total ?? 0)
+                        return (
+                          <div key={i} className="mt-2 space-y-1.5">
+                            <div className="text-xs text-[#81c784]">✓ {generated}/{total}개 로고 생성 완료</div>
+                            {generated > 0 && (
+                              <div className="text-[10px] text-[#555]">갤러리에서 확인하세요 →</div>
+                            )}
+                          </div>
+                        )
+                      }
+                      if (toolName === "edit_logo") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ 로고 #{String(result?.logoIndex)} v{String(result?.versionNumber)} 편집 완료</div>
+                    }
+                  }
+                  return null
+                })
               })()}
             </div>
           </div>

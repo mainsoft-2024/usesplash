@@ -48,6 +48,15 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     if (!chat.isLoading) logos.refetch()
   }, [chat.isLoading, chat.messages.length])
 
+
+  // Poll gallery during AI generation
+  useEffect(() => {
+    if (!chat.isLoading) return
+    const interval = setInterval(() => {
+      logos.refetch()
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [chat.isLoading])
   if (project.isLoading) return <div className="flex items-center justify-center h-screen text-[#666]">로딩 중...</div>
 
   return (
