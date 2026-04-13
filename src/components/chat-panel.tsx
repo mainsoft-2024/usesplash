@@ -1,18 +1,16 @@
 "use client"
 
-import { useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRef, useEffect, useState } from "react"
 import type { useProjectChat } from "@/lib/chat/hooks"
 
 type ChatProps = {
-  projectName: string
   chat: ReturnType<typeof useProjectChat>
-  projectId: string
 }
 
-export function ChatPanel({ projectName, chat }: ChatProps) {
-  const router = useRouter()
+export function ChatPanel({ chat }: ChatProps) {
   const endRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [isFocused, setIsFocused] = useState(false)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -20,12 +18,7 @@ export function ChatPanel({ projectName, chat }: ChatProps) {
 
   return (
     <div className="h-full flex flex-col bg-[#0e0e0e]">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#2a2a2a]">
-        <button onClick={() => router.push("/projects")} className="text-[#666] hover:text-white text-lg" title="프로젝트 목록">←</button>
-        <h2 className="font-semibold text-sm truncate">{projectName}</h2>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
         {chat.messages.length === 0 && (
           <div className="text-center text-[#555] py-12">
             <p className="text-lg mb-2">Splash에 오신 것을 환영합니다</p>
@@ -100,18 +93,52 @@ export function ChatPanel({ projectName, chat }: ChatProps) {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={chat.handleSubmit} className="p-3 border-t border-[#2a2a2a]">
-        <div className="flex gap-2">
-          <textarea
-            value={chat.input}
-            onChange={(e) => chat.setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chat.handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>) } }}
-            placeholder="메시지를 입력하세요..."
-            rows={1}
-            className="flex-1 resize-none px-4 py-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl text-white text-sm placeholder-[#555] focus:outline-none focus:border-[#4CAF50]"
-          />
-          <button type="submit" disabled={!chat.input.trim() || chat.isLoading} className="px-4 py-2.5 bg-[#4CAF50] text-white rounded-xl font-medium hover:bg-[#43A047] disabled:opacity-50 transition-colors">전송</button>
+      <form onSubmit={chat.handleSubmit} className="p-4 border-t border-[#1a1a1a]">
+        <div className="rounded-2xl border border-[#2a2a2a] bg-[#141414] p-2 transition-colors focus-within:border-[#4CAF50]/50">
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={chat.input}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              onChange={(e) => {
+                chat.setInput(e.target.value)
+                e.target.style.height = "auto"
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
+              }}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || ("isComposing" in e && e.isComposing)) return
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  if (chat.input.trim() && !chat.isLoading) {
+                    chat.handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>)
+                  }
+                }
+              }}
+              placeholder="메시지를 입력하세요..."
+              rows={1}
+              className="flex-1 resize-none bg-transparent text-white text-sm placeholder-[#555] focus:outline-none max-h-[120px]"
+            />
+            {chat.isLoading ? (
+              <button
+                type="button"
+                onClick={chat.stop}
+                className="h-9 px-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
+              >
+                정지
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!chat.input.trim()}
+                className="h-9 px-4 bg-[#4CAF50] text-white rounded-xl font-medium hover:bg-[#43A047] disabled:opacity-50 transition-colors"
+              >
+                전송
+              </button>
+            )}
+          </div>
         </div>
+        {isFocused && <div className="text-[10px] text-[#333] text-right mt-1.5">Shift+Enter 줄바꿈</div>}
       </form>
     </div>
   )

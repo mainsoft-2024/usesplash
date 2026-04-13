@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react"
 import type { UIMessage } from "ai"
+import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { useProjectChat } from "@/lib/chat/hooks"
 import { ChatPanel } from "@/components/chat-panel"
@@ -9,6 +10,7 @@ import { GalleryPanel } from "@/components/gallery-panel"
 
 export default function ProjectWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id: projectId } = use(params)
+  const router = useRouter()
   const [splitPos, setSplitPos] = useState(40)
   const dragging = useRef(false)
 
@@ -49,13 +51,37 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
   if (project.isLoading) return <div className="flex items-center justify-center h-screen text-[#666]">로딩 중...</div>
 
   return (
-    <div className="h-screen flex overflow-hidden">
-      <div style={{ width: `${splitPos}%` }} className="h-full flex-shrink-0">
-        <ChatPanel projectName={project.data?.name ?? ""} chat={chat} projectId={projectId} />
+    <div className="h-screen flex flex-col overflow-hidden bg-[#0a0a0a]">
+      <div className="h-12 flex items-center justify-between px-4 border-b border-[#1a1a1a] bg-[#0a0a0a] flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <button onClick={() => router.push("/projects")} className="text-[#555] hover:text-white transition-colors text-sm">
+            ← 프로젝트목록
+          </button>
+          <span className="text-[#333]">|</span>
+          <span className="text-sm font-medium truncate max-w-[260px]">{project.data?.name}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {chat.isLoading && (
+            <span className="flex items-center gap-1.5 text-xs text-[#ffb74d]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ffb74d] animate-pulse" />
+              AI 응답 중
+            </span>
+          )}
+          <span className="text-xs text-[#555]">{logos.data?.length ?? 0} logos</span>
+        </div>
       </div>
-      <div className="w-1 bg-[#2a2a2a] hover:bg-[#4CAF50] cursor-col-resize transition-colors flex-shrink-0" onMouseDown={handleMouseDown} />
-      <div style={{ width: `${100 - splitPos}%` }} className="h-full flex-shrink-0 overflow-hidden">
-        <GalleryPanel logos={logos.data ?? []} isLoading={logos.isLoading} projectId={projectId} onRefresh={() => logos.refetch()} />
+      <div className="flex-1 flex overflow-hidden">
+        <div style={{ width: `${splitPos}%` }} className="h-full flex-shrink-0">
+          <ChatPanel chat={chat} />
+        </div>
+        <div className="relative w-1 flex-shrink-0">
+          <div className="absolute inset-0 bg-[#1f1f1f] hover:bg-[#4CAF50] cursor-col-resize transition-colors" onMouseDown={handleMouseDown} />
+          <div className="pointer-events-none absolute -left-3 top-0 h-full w-3 bg-gradient-to-r from-transparent to-[#0e0e0e]/70" />
+          <div className="pointer-events-none absolute left-1 top-0 h-full w-3 bg-gradient-to-r from-[#0e0e0e]/70 to-transparent" />
+        </div>
+        <div style={{ width: `${100 - splitPos}%` }} className="h-full flex-shrink-0 overflow-hidden">
+          <GalleryPanel logos={logos.data ?? []} isLoading={logos.isLoading} projectId={projectId} onRefresh={() => logos.refetch()} />
+        </div>
       </div>
     </div>
   )

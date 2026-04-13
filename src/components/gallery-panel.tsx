@@ -28,7 +28,7 @@ type GalleryProps = {
   onRefresh: () => void
 }
 
-export function GalleryPanel({ logos, isLoading }: GalleryProps) {
+export function GalleryPanel({ logos, isLoading, onRefresh }: GalleryProps) {
   const [activeIdx, setActiveIdx] = useState<Record<string, number>>({})
   const [modalIdx, setModalIdx] = useState<number | null>(null)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -61,7 +61,19 @@ export function GalleryPanel({ logos, isLoading }: GalleryProps) {
     return () => window.removeEventListener("keydown", h)
   }, [modalIdx, logos, cycle, getVer])
 
-  if (isLoading) return <div className="h-full flex items-center justify-center text-[#666]">갤러리 로딩...</div>
+  if (isLoading) return <div className="h-full flex-1 overflow-y-auto p-4">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+      {Array.from({ length: 6 }).map((_, idx) => (
+        <div key={idx} className="rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden animate-pulse">
+          <div className="aspect-[4/3] bg-[#2a2a2a]" />
+          <div className="px-3 py-3 space-y-2">
+            <div className="h-3 w-20 rounded bg-[#2a2a2a]" />
+            <div className="h-2.5 w-32 rounded bg-[#232323]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
   if (!logos.length) return <div className="h-full flex items-center justify-center px-6">
     <div className="relative w-full max-w-md rounded-2xl p-[1px]">
       <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#2a2a2a] via-[#4CAF50]/50 to-[#2a2a2a] opacity-60 blur-sm animate-pulse" />
@@ -74,23 +86,26 @@ export function GalleryPanel({ logos, isLoading }: GalleryProps) {
 
   const mLogo = modalIdx !== null ? logos[modalIdx] : null
   const mVer = mLogo ? getVer(mLogo) : null
+  const revCount = logos.reduce((sum, logo) => sum + Math.max(0, logo.versions.length - 1), 0)
 
   return (
     <div className="h-full flex flex-col bg-[#0e0e0e]">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]">
-        <div className="text-sm text-[#81c784] font-medium">{logos.length} logos · {logos.reduce((s, l) => s + Math.max(0, l.versions.length - 1), 0)} revisions</div>
-        <div className="text-xs text-[#555]">← → 로고 · ↑ ↓ 버전 · F 즐겨찾기</div>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
+        <span className="text-xs text-[#666]">{logos.length}개 로고{revCount > 0 ? ` · ${revCount}개 수정본` : ""}</span>
+        <button onClick={onRefresh} className="text-[#555] hover:text-white transition-colors" title="새로고침">
+          ↻
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           {logos.map((logo, idx) => {
             const ver = getVer(logo)
             const ai = activeIdx[logo.id] ?? 0
             const isRev = ai > 0
             const hasRevs = logo.versions.length > 1
             return (
-              <div key={logo.id} className={`bg-[#1e1e1e] rounded-xl overflow-hidden transition-shadow hover:shadow-[0_4px_20px_rgba(0,0,0,0.5)] group ${hasRevs ? "border border-[#333]" : ""}`}>
+              <div key={logo.id} className={`group bg-[#1a1a1a] rounded-2xl overflow-hidden border transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_12px_34px_rgba(0,0,0,0.45)] ${hasRevs ? "border-[#333]" : "border-[#2a2a2a]"}`}>
                 <div className="relative bg-white cursor-pointer aspect-[4/3] overflow-hidden" onClick={() => setModalIdx(idx)}>
                   <img src={ver.imageUrl} alt="" className="w-full h-full object-contain" />
                   <span className={`absolute top-2 left-2 px-2.5 py-0.5 rounded-lg text-[10px] font-bold tracking-wide ${isRev ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
@@ -101,8 +116,8 @@ export function GalleryPanel({ logos, isLoading }: GalleryProps) {
                     <button onClick={(e) => { e.stopPropagation(); cycle(logo.id, 1, logo.versions.length) }} className="absolute bottom-1.5 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm opacity-0 group-hover:opacity-100 transition-opacity border-none">▼</button>
                   </>)}
                 </div>
-                <div className="px-3 py-2.5 flex items-center gap-2">
-                  <span className="text-xs font-semibold">#{logo.orderIndex + 1}</span>
+                <div className="px-3.5 py-3 flex items-center gap-2.5">
+                  <span className="text-xs font-semibold text-[#d7d7d7]">#{logo.orderIndex + 1}</span>
                   {isRev && <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-[#2d4a1e] text-[#81c784]">REV</span>}
                   {ver.editPrompt && <span className="text-[#777] text-[11px] truncate flex-1">{ver.editPrompt}</span>}
                   {hasRevs && <div className="ml-auto flex gap-1">{logo.versions.map((_, vi) => <div key={vi} className={`w-1.5 h-1.5 rounded-full ${vi === ai ? "bg-[#4CAF50]" : "bg-[#444]"}`} />)}</div>}

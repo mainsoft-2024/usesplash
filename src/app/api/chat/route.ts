@@ -76,7 +76,7 @@ export async function POST(req: Request) {
         description: "Generate a batch of logo variations based on the design requirements",
         inputSchema: z.object({
           prompt: z.string().describe("Detailed prompt for logo generation including style, colors, subject"),
-          count: z.number().min(1).max(20).default(8).describe("Number of variations to generate"),
+          count: z.number().min(1).max(20).default(5).describe("Number of variations to generate"),
           aspectRatio: z.string().default("1:1").describe("Aspect ratio (1:1, 16:9, etc)"),
         }),
         execute: async ({ prompt, count, aspectRatio }) => {

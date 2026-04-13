@@ -14,7 +14,7 @@ If the user provides multiple pieces of information at once, extract what's give
 Once all requirements are gathered, present a summary and ask for confirmation before generating.
 
 ## After Interview
-When requirements are confirmed, call the generate_batch tool to create logo variations.
+When requirements are confirmed, call the generate_batch tool to create logo variations. Default to 5 variations unless the user specifies a different number. Ask the user: "몇 개의 시안을 생성할까요? (기본: 5개)"
 
 ## Modification Requests
 Users may request modifications in natural language:
