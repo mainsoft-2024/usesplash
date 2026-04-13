@@ -11,6 +11,7 @@ export const maxDuration = 120
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
+  compatibility: "compatible",
 })
 
 const DEFAULT_MODEL = process.env.OPENROUTER_MODEL ?? "anthropic/claude-sonnet-4"
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
   }
 
   const streamResult = streamText({
-    model: openrouter.chat(DEFAULT_MODEL),
+    model: openrouter(DEFAULT_MODEL),
     system: systemPrompt,
     messages: await convertToModelMessages(messages),
     tools: {
