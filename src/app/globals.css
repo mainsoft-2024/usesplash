@@ -22,6 +22,7 @@
   --badge-green-bg: #1e2e1e;
   --badge-yellow-bg: #2e2e1e;
   --divider: #1f1f1f;
+  --accent-red: #ef4444;
 }
 
 body {
@@ -59,4 +60,16 @@ body {
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.95) translateY(4px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+html { scroll-behavior: smooth; }
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
