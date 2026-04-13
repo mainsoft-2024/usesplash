@@ -1,13 +1,13 @@
-import { convertToModelMessages, streamText, tool, type UIMessage } from "ai"
+import { consumeStream, convertToModelMessages, stepCountIs, streamText, tool, type UIMessage } from "ai"
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { z } from "zod"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildSystemPrompt } from "@/lib/chat/system-prompt"
-import { generateLogoImage, editLogoImage } from "@/lib/gemini"
+import { generateLogoImage, editLogoImage, withGeminiConcurrency } from "@/lib/gemini"
 import { uploadImage, getStorageKey } from "@/lib/storage"
 
-export const maxDuration = 120
+export const maxDuration = 300
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   const streamResult = streamText({
     model: openrouter(DEFAULT_MODEL),
     system: systemPrompt,
-    messages: await convertToModelMessages(messages),
+    messages: await convertToModelMessages(messages, { ignoreIncompleteToolCalls: true }),
     tools: {
       generate_batch: tool({
         description: "Generate a batch of logo variations based on the design requirements",
@@ -86,15 +86,27 @@ export async function POST(req: Request) {
             where: { projectId },
             orderBy: { orderIndex: "desc" },
           })
-          let orderIndex = (lastLogo?.orderIndex ?? -1) + 1
+          let startIndex = (lastLogo?.orderIndex ?? -1) + 1
 
-          for (let i = 0; i < count; i++) {
+          // Generate all images in parallel
+          const generatePromises = Array.from({ length: count }, (_, i) =>
+            withGeminiConcurrency(() => generateLogoImage(prompt, { aspectRatio }))
+              .then(result => ({ index: i, result, error: null as string | null }))
+              .catch(e => ({ index: i, result: null as any, error: e instanceof Error ? e.message : "Unknown error" }))
+          )
+          const results = await Promise.all(generatePromises)
+
+          // Save successful results to DB sequentially (to maintain order)
+          for (const { index, result, error } of results) {
+            if (!result) {
+              console.error(`Generation ${index + 1}/${count}: failed -`, error || "null result")
+              continue
+            }
+
             try {
-              const result = await generateLogoImage(prompt, { aspectRatio })
-              if (!result) continue
-
+              const orderIndex = startIndex + index
               const logo = await prisma.logo.create({
-                data: { projectId, orderIndex: orderIndex++, prompt, aspectRatio },
+                data: { projectId, orderIndex, prompt, aspectRatio },
               })
 
               const s3Key = getStorageKey(userId, projectId, logo.id, "v1")
@@ -104,12 +116,11 @@ export async function POST(req: Request) {
                 data: { logoId: logo.id, versionNumber: 1, imageUrl, s3Key },
               })
 
-              logos.push({ logoId: logo.id, orderIndex: logo.orderIndex, imageUrl })
+              logos.push({ logoId: logo.id, orderIndex, imageUrl })
+              console.log(`Generation ${index + 1}/${count}: success, logoId=${logo.id}`)
             } catch (e) {
-              console.error(`Generation ${i + 1} failed:`, e)
+              console.error(`Generation ${index + 1}/${count} save failed:`, e)
             }
-
-            if (i < count - 1) await new Promise((r) => setTimeout(r, 3000))
           }
 
           // Update usage
@@ -121,7 +132,25 @@ export async function POST(req: Request) {
             })
           }
 
-          return { generated: logos.length, total: count, logos }
+          if (logos.length === count) {
+            return { generated: logos.length, total: count, logos }
+          }
+
+          if (logos.length === 0) {
+            return {
+              generated: 0,
+              total: count,
+              logos,
+              error: `Failed to generate logos (0/${count}). The image service is temporarily unavailable. Please retry in a moment.`,
+            }
+          }
+
+          return {
+            generated: logos.length,
+            total: count,
+            logos,
+            error: `Generated ${logos.length}/${count} logos. ${count - logos.length} failed due to temporary image API limits. Retry to generate the remaining logos.`,
+          }
         },
       }),
 
@@ -154,12 +183,25 @@ export async function POST(req: Request) {
 
           // Download source image
           const imgRes = await fetch(sourceVersion.imageUrl)
+          if (!imgRes.ok) {
+            return {
+              error: `Failed to load logo #${logoOrderIndex} source image (v${sourceVersion.versionNumber}). Please retry.`,
+            }
+          }
           const sourceBuffer = Buffer.from(await imgRes.arrayBuffer())
 
-          // Edit
-          const result = await editLogoImage(editPrompt, sourceBuffer)
+          let result: Awaited<ReturnType<typeof editLogoImage>>
+          try {
+            result = await editLogoImage(editPrompt, sourceBuffer)
+          } catch (error) {
+            return {
+              error: `Image editing failed due to an upstream Gemini error: ${error instanceof Error ? error.message : "Unknown error"}. Please retry in 30 seconds.`,
+            }
+          }
           if (!result) {
-            return { error: "Image editing failed - try rephrasing the edit request" }
+            return {
+              error: "Image editing did not return an image. This is usually a temporary provider issue (429/503). Please retry in 30 seconds.",
+            }
           }
 
           const nextVersion = (logo.versions[0]?.versionNumber ?? 0) + 1
@@ -195,15 +237,37 @@ export async function POST(req: Request) {
         },
       }),
     },
-    onFinish: async ({ text }) => {
-      // Save assistant response to DB
-      if (text) {
+    stopWhen: stepCountIs(3),
+    onFinish: async ({ text, steps }) => {
+      const parts: any[] = []
+      for (const step of steps) {
+        if (step.text) parts.push({ type: "text", text: step.text })
+        if (step.toolCalls) {
+          for (const tc of step.toolCalls) {
+            const tr = step.toolResults?.find((r: any) => r.toolCallId === tc.toolCallId)
+            parts.push({
+              type: `tool-${tc.toolName}`,
+              toolCallId: tc.toolCallId,
+              toolName: tc.toolName,
+              state: tr ? "output-available" : "output-error",
+              input: (tc as any).args ?? (tc as any).input,
+              output: (tr as any)?.result ?? (tr as any)?.output,
+            })
+          }
+        }
+      }
+      if (parts.length > 0 || text) {
         await prisma.chatMessage.create({
-          data: { projectId, role: "assistant", content: text },
+          data: {
+            projectId,
+            role: "assistant",
+            content: text || "",
+            parts: parts.length > 0 ? parts : undefined,
+          },
         })
       }
     },
   })
 
-  return streamResult.toUIMessageStreamResponse()
+  return streamResult.toUIMessageStreamResponse({ consumeSseStream: consumeStream })
 }

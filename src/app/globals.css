@@ -12,6 +12,16 @@
   --accent-green: #4CAF50;
   --accent-green-light: #81c784;
   --accent-orange: #ffb74d;
+  --bg-deep: #0a0a0a;
+  --text-muted: #444444;
+  --text-dim: #555555;
+  --accent-green-hover: #43A047;
+  --accent-purple: #8888cc;
+  --accent-yellow: #cccc66;
+  --badge-purple-bg: #1e1e2e;
+  --badge-green-bg: #1e2e1e;
+  --badge-yellow-bg: #2e2e1e;
+  --divider: #1f1f1f;
 }
 
 body {
@@ -39,4 +49,14 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }

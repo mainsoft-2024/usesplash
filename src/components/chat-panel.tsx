@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react"
 import type { useProjectChat } from "@/lib/chat/hooks"
+import { PulseSpinner, WaveSpinner } from "@/components/spinners"
 
 type ChatProps = {
   chat: ReturnType<typeof useProjectChat>
@@ -15,6 +16,22 @@ export function ChatPanel({ chat }: ChatProps) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chat.messages])
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null
+  }
+
+  function getToolData(part: unknown) {
+    if (!isRecord(part)) {
+      return { input: {}, output: {}, state: undefined as string | undefined }
+    }
+
+    const input = isRecord(part.input) ? part.input : {}
+    const output = isRecord(part.output) ? part.output : {}
+    const state = typeof part.state === "string" ? part.state : undefined
+
+    return { input, output, state }
+  }
 
   return (
     <div className="h-full flex flex-col bg-[#0e0e0e]">
@@ -44,59 +61,81 @@ export function ChatPanel({ chat }: ChatProps) {
               msg.role === "user" ? "bg-[#4CAF50] text-white" : "bg-[#1e1e1e] text-[#ddd] border border-[#2a2a2a]"
             }`}>
               {(() => {
-                const parts = msg.parts as Array<Record<string, unknown>> | undefined
+                const parts = msg.parts
                 if (!parts || parts.length === 0) {
                   return <span className="text-[#555]">...</span>
                 }
 
                 return parts.map((part, i) => {
-                  if (part.type === "text") return <span key={i}>{String(part.text ?? "")}</span>
-                  if (part.type === "tool-invocation") {
-                    const inv = part.toolInvocation as Record<string, unknown>
-                    const toolName = inv.toolName as string
-                    const state = inv.state as string
+                  if (part.type === "text") return <span key={i}>{part.text}</span>
 
-                    if (state === "call") {
-                      const args = inv.args as Record<string, unknown> | undefined
-                      const count = args?.count ?? 5
+                  if (part.type === "tool-generate_batch") {
+                    const { input, output, state } = getToolData(part)
+                    const count = Number(input.count ?? 5)
+                    if (state === "input-available" || state === "input-streaming") {
                       return (
                         <div key={i} className="mt-2 space-y-1.5">
                           <div className="flex items-center gap-2 text-xs text-[#ffb74d]">
-                            <span className="inline-block w-3 h-3 border-2 border-[#ffb74d] border-t-transparent rounded-full animate-spin" />
-                            {toolName === "generate_batch" ? `로고 ${count}개 생성 중...` : "로고 편집 중..."}
+                            <PulseSpinner size={16} color="#ffb74d" />
+                            로고 {count}개 생성 중...
                           </div>
-                          {toolName === "generate_batch" && (
-                            <div className="flex gap-1">
-                              {Array.from({ length: Number(count) }, (_, j) => (
-                                <div
-                                  key={j}
-                                  className="w-8 h-8 rounded-lg bg-[#2a2a2a] animate-pulse"
-                                  style={{ animationDelay: `${j * 300}ms` }}
-                                />
-                              ))}
-                            </div>
-                          )}
+                          <div className="flex gap-1">
+                            {Array.from({ length: Number(count) }, (_, j) => (
+                              <div
+                                key={j}
+                                className="w-8 h-8 rounded-lg bg-[#2a2a2a] animate-pulse"
+                                style={{ animationDelay: `${j * 300}ms` }}
+                              />
+                            ))}
+                          </div>
                         </div>
                       )
                     }
-
-                    if (state === "result") {
-                      const result = inv.result as Record<string, unknown> | undefined
-                      if (toolName === "generate_batch") {
-                        const generated = Number(result?.generated ?? 0)
-                        const total = Number(result?.total ?? 0)
-                        return (
-                          <div key={i} className="mt-2 space-y-1.5">
-                            <div className="text-xs text-[#81c784]">✓ {generated}/{total}개 로고 생성 완료</div>
-                            {generated > 0 && (
-                              <div className="text-[10px] text-[#555]">갤러리에서 확인하세요 →</div>
-                            )}
+                    if (state === "output-available") {
+                      const generated = Number(output.generated ?? 0)
+                      const total = Number(output.total ?? 0)
+                      const isPartial = generated > 0 && generated < total
+                      return (
+                        <div key={i} className="mt-2 space-y-1.5">
+                          <div className={`text-xs ${isPartial ? "text-[#ffb74d]" : "text-[#81c784]"}`}>
+                            {isPartial ? `⚠ ${generated}/${total}개 생성 (일부 실패)` : `✓ ${generated}/${total}개 로고 생성 완료`}
                           </div>
-                        )
-                      }
-                      if (toolName === "edit_logo") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ 로고 #{String(result?.logoIndex)} v{String(result?.versionNumber)} 편집 완료</div>
+                          {generated > 0 && <div className="text-[10px] text-[#555]">갤러리에서 확인하세요 →</div>}
+                        </div>
+                      )
                     }
+                    if (state === "output-error") {
+                      return (
+                        <div key={i} className="mt-2 space-y-1.5">
+                          <div className="text-xs text-red-400">✗ 로고 생성 실패</div>
+                          <div className="text-[10px] text-red-300">잠시 후 다시 시도해주세요</div>
+                        </div>
+                      )
+                    }
+                    return null
                   }
+
+                  if (part.type === "tool-edit_logo") {
+                    const { output, state } = getToolData(part)
+                    if (state === "input-available" || state === "input-streaming") {
+                      return (
+                        <div key={i} className="mt-2">
+                          <div className="flex items-center gap-2 text-xs text-[#ffb74d]">
+                            <PulseSpinner size={16} color="#ffb74d" />
+                            로고 편집 중...
+                          </div>
+                        </div>
+                      )
+                    }
+                    if (state === "output-available") {
+                      return <div key={i} className="text-xs text-[#81c784] mt-2">✓ 로고 #{String(output?.logoIndex)} v{String(output?.versionNumber)} 편집 완료</div>
+                    }
+                    if (state === "output-error") {
+                      return <div key={i} className="text-xs text-red-400 mt-2">✗ 편집 실패</div>
+                    }
+                    return null
+                  }
+
                   return null
                 })
               })()}
@@ -115,11 +154,7 @@ export function ChatPanel({ chat }: ChatProps) {
         {chat.isLoading && (
           <div className="flex justify-start">
             <div className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-2xl px-4 py-3">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-[#555] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 bg-[#555] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 bg-[#555] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
+              <WaveSpinner size={24} color="#4CAF50" />
             </div>
           </div>
         )}

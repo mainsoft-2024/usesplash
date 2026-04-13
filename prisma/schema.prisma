@@ -102,6 +102,7 @@ model ChatMessage {
   projectId   String
   role        String
   content     String   @db.Text
+  parts       Json?
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   logoVersions LogoVersion[]
   createdAt   DateTime @default(now())

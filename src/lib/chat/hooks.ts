@@ -2,12 +2,12 @@
 
 import { useChat as useAIChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 export function useProjectChat(projectId: string, initialMessages?: UIMessage[]) {
   const [input, setInput] = useState("")
+  const prevLengthRef = useRef(0)
 
-  // Memoize transport to avoid recreating on every render
   const transport = useMemo(
     () => new DefaultChatTransport({ api: "/api/chat", body: { projectId } }),
     [projectId]
@@ -15,9 +15,20 @@ export function useProjectChat(projectId: string, initialMessages?: UIMessage[])
 
   const chat = useAIChat({
     id: projectId,
-    messages: initialMessages,
     transport,
+    messages: initialMessages,
   })
+
+  useEffect(() => {
+    const nextLength = initialMessages?.length ?? 0
+    const prevLength = prevLengthRef.current
+
+    if (prevLength === 0 && nextLength > 0 && initialMessages) {
+      chat.setMessages(initialMessages)
+    }
+
+    prevLengthRef.current = nextLength
+  }, [initialMessages])
 
   const sendMessage = useCallback(
     (content: string) => {

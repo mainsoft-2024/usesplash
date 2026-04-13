@@ -21,14 +21,21 @@ type Logo = {
   versions: LogoVersion[]
 }
 
+type ToolActivity =
+  | { type: "idle" }
+  | { type: "generating"; count: number }
+  | { type: "editing"; logoIndex: number; versionNumber?: number }
+  | { type: "generated"; count: number; generated: number }
+  | { type: "edited"; logoIndex: number; versionNumber: number }
+
 type GalleryProps = {
   logos: Logo[]
   isLoading: boolean
   projectId: string
   onRefresh: () => void
+  toolActivity?: ToolActivity
 }
-
-export function GalleryPanel({ logos, isLoading, onRefresh }: GalleryProps) {
+export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: GalleryProps) {
   const [activeIdx, setActiveIdx] = useState<Record<string, number>>({})
   const [modalIdx, setModalIdx] = useState<number | null>(null)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -98,29 +105,74 @@ export function GalleryPanel({ logos, isLoading, onRefresh }: GalleryProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+          {(toolActivity?.type === "generated" && toolActivity.generated > 0) && (
+            <div className="col-span-full mb-3 px-3 py-2 bg-[#1a2e1a] border border-[#4CAF50]/30 rounded-lg">
+              <div className="text-xs text-[#81c784]">✓ {toolActivity.generated}개 새 로고가 추가되었습니다</div>
+            </div>
+          )}
+          {toolActivity?.type === "generating" && (
+            <div className="col-span-full mb-4">
+              <div className="text-xs text-[#ffb74d] mb-2 flex items-center gap-2">
+                <span className="inline-block w-3 h-3 border-2 border-[#ffb74d] border-t-transparent rounded-full animate-spin" />
+                로고 {toolActivity.count}개 생성 중...
+              </div>
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+                {Array.from({ length: toolActivity.count }, (_, i) => (
+                  <div key={`gen-${i}`} className="aspect-square rounded-lg bg-[#1a1a1a] animate-pulse border border-[#333]" style={{ animationDelay: `${i * 200}ms` }} />
+                ))}
+              </div>
+            </div>
+          )}
           {logos.map((logo, idx) => {
             const ver = getVer(logo)
             const ai = activeIdx[logo.id] ?? 0
             const isRev = ai > 0
             const hasRevs = logo.versions.length > 1
+            const isBeingEdited = toolActivity?.type === "editing" && logo.orderIndex + 1 === toolActivity.logoIndex
+            const justEdited = toolActivity?.type === "edited" && logo.orderIndex + 1 === toolActivity.logoIndex
             return (
-              <div key={logo.id} className={`group bg-[#1a1a1a] rounded-2xl overflow-hidden border transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_12px_34px_rgba(0,0,0,0.45)] ${hasRevs ? "border-[#333]" : "border-[#2a2a2a]"}`}>
-                <div className="relative bg-white cursor-pointer aspect-[4/3] overflow-hidden" onClick={() => setModalIdx(idx)}>
+              <div key={logo.id} className={`group relative rounded-2xl overflow-hidden border transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_12px_34px_rgba(0,0,0,0.45)] ${hasRevs ? "border-[#333]" : "border-[#2a2a2a]"} ${isBeingEdited ? "ring-2 ring-[#ffb74d] ring-offset-2 ring-offset-[#0e0e0e]" : ""} ${justEdited ? "ring-2 ring-[#4CAF50] ring-offset-2 ring-offset-[#0e0e0e]" : ""}`}>
+                {/* Fixed aspect ratio container — this NEVER changes height */}
+                <div className="relative bg-white cursor-pointer aspect-square overflow-hidden" onClick={() => setModalIdx(idx)}>
                   <img src={ver.imageUrl} alt="" className="w-full h-full object-contain" />
+
+                  {/* Top-left: Logo number badge */}
                   <span className={`absolute top-2 left-2 px-2.5 py-0.5 rounded-lg text-[10px] font-bold tracking-wide ${isRev ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
-                    {isRev ? `REV v${ai}` : "ORIGINAL"}
+                    #{logo.orderIndex + 1}{isRev ? ` · v${ai}` : ""}
                   </span>
+
+                  {/* Editing overlay */}
+                  {isBeingEdited && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="text-xs text-[#ffb74d] flex items-center gap-1.5">
+                        <span className="inline-block w-3 h-3 border-2 border-[#ffb74d] border-t-transparent rounded-full animate-spin" />
+                        편집 중...
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bottom overlay — only visible on hover, shows edit prompt + version dots */}
+                  {(hasRevs || ver.editPrompt) && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-3 pb-2 pt-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {ver.editPrompt && (
+                        <p className="text-[11px] text-white/80 truncate mb-1">{ver.editPrompt}</p>
+                      )}
+                      {hasRevs && (
+                        <div className="flex items-center gap-1">
+                          {logo.versions.map((_, vi) => (
+                            <div key={vi} className={`w-1.5 h-1.5 rounded-full ${vi === ai ? "bg-[#4CAF50]" : "bg-white/40"}`} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Version navigation buttons */}
                   {hasRevs && (<>
-                    <button onClick={(e) => { e.stopPropagation(); cycle(logo.id, -1, logo.versions.length) }} className="absolute top-1.5 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm opacity-0 group-hover:opacity-100 transition-opacity border-none">▲</button>
-                    <button onClick={(e) => { e.stopPropagation(); cycle(logo.id, 1, logo.versions.length) }} className="absolute bottom-1.5 left-1/2 -translate-x-1/2 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-7 h-7 flex items-center justify-center text-sm opacity-0 group-hover:opacity-100 transition-opacity border-none">▼</button>
+                    <button onClick={(e) => { e.stopPropagation(); cycle(logo.id, -1, logo.versions.length) }} className="absolute top-1.5 right-2 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity border-none hover:bg-[rgba(76,175,80,0.7)]">▲</button>
+                    <button onClick={(e) => { e.stopPropagation(); cycle(logo.id, 1, logo.versions.length) }} className="absolute bottom-1.5 right-2 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity border-none hover:bg-[rgba(76,175,80,0.7)]">▼</button>
                   </>)}
-                </div>
-                <div className="px-3.5 py-3 flex items-center gap-2.5">
-                  <span className="text-xs font-semibold text-[#d7d7d7]">#{logo.orderIndex + 1}</span>
-                  {isRev && <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-[#2d4a1e] text-[#81c784]">REV</span>}
-                  {ver.editPrompt && <span className="text-[#777] text-[11px] truncate flex-1">{ver.editPrompt}</span>}
-                  {hasRevs && <div className="ml-auto flex gap-1">{logo.versions.map((_, vi) => <div key={vi} className={`w-1.5 h-1.5 rounded-full ${vi === ai ? "bg-[#4CAF50]" : "bg-[#444]"}`} />)}</div>}
                 </div>
               </div>
             )
@@ -131,37 +183,43 @@ export function GalleryPanel({ logos, isLoading, onRefresh }: GalleryProps) {
       {favorites.size > 0 && <div className="px-4 py-2.5 border-t border-[#333] bg-[#1a1a1a] text-sm"><span className="text-[#666]">즐겨찾기: </span><span className="text-[#4CAF50] font-medium">{favorites.size}개 선택</span></div>}
 
       {mLogo && mVer && (
-        <div className="fixed inset-0 bg-[rgba(0,0,0,0.92)] z-50 flex items-center justify-center flex-col" onClick={() => setModalIdx(null)}>
-          <span className="absolute top-4 right-6 text-white text-4xl cursor-pointer hover:text-[#4CAF50]" onClick={() => setModalIdx(null)}>×</span>
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white text-5xl cursor-pointer opacity-60 hover:opacity-100 hover:text-[#4CAF50] select-none px-4" onClick={(e) => { e.stopPropagation(); setModalIdx((p) => p !== null ? (p - 1 + logos.length) % logos.length : null) }}>‹</span>
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white text-5xl cursor-pointer opacity-60 hover:opacity-100 hover:text-[#4CAF50] select-none px-4" onClick={(e) => { e.stopPropagation(); setModalIdx((p) => p !== null ? (p + 1) % logos.length : null) }}>›</span>
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.92)] z-50 flex flex-col" onClick={() => setModalIdx(null)}>
+          <span className="absolute top-4 right-6 text-white text-4xl cursor-pointer hover:text-[#4CAF50] z-10" onClick={() => setModalIdx(null)}>×</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white text-5xl cursor-pointer opacity-60 hover:opacity-100 hover:text-[#4CAF50] select-none px-4 z-10" onClick={(e) => { e.stopPropagation(); setModalIdx((p) => p !== null ? (p - 1 + logos.length) % logos.length : null) }}>‹</span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white text-5xl cursor-pointer opacity-60 hover:opacity-100 hover:text-[#4CAF50] select-none px-4 z-10" onClick={(e) => { e.stopPropagation(); setModalIdx((p) => p !== null ? (p + 1) % logos.length : null) }}>›</span>
 
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
-            <img src={mVer.imageUrl} alt="" className="max-w-[85vw] max-h-[60vh] bg-white p-6 rounded-xl" />
-            <span className={`absolute top-3 left-3 px-3 py-1 rounded-xl text-xs font-bold ${(activeIdx[mLogo.id] ?? 0) > 0 ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
-              {(activeIdx[mLogo.id] ?? 0) > 0 ? `REV v${activeIdx[mLogo.id]}` : "ORIGINAL"}
-            </span>
+          {/* Image area — fixed position, always vertically centered */}
+          <div className="flex-1 flex items-center justify-center min-h-0" onClick={(e) => e.stopPropagation()}>
+            <div className="relative">
+              <img src={mVer.imageUrl} alt="" className="max-w-[85vw] max-h-[55vh] bg-white p-6 rounded-xl" />
+              <span className={`absolute top-3 left-3 px-3 py-1 rounded-xl text-xs font-bold ${(activeIdx[mLogo.id] ?? 0) > 0 ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
+                {(activeIdx[mLogo.id] ?? 0) > 0 ? `REV v${activeIdx[mLogo.id]}` : "ORIGINAL"}
+              </span>
+            </div>
           </div>
 
-          <div className="mt-4 text-center" onClick={(e) => e.stopPropagation()}>
+          {/* Info area — fixed height at bottom, never affects image position */}
+          <div className="shrink-0 h-40 flex flex-col items-center justify-start pt-2 pb-4" onClick={(e) => e.stopPropagation()}>
             <div className="text-base font-semibold">#{mLogo.orderIndex + 1}</div>
-            {mVer.editPrompt && <div className="text-[#81c784] text-xs mt-1">{mVer.editPrompt}</div>}
+            <div className="h-5 flex items-center">
+              {mVer.editPrompt ? <span className="text-[#81c784] text-xs truncate max-w-[60vw]">{mVer.editPrompt}</span> : <span className="text-[#555] text-xs">원본</span>}
+            </div>
             {mLogo.versions.length > 1 && (
-              <div className="flex items-center gap-3 mt-2 justify-center">
+              <div className="flex items-center gap-3 mt-1 justify-center">
                 <span className="text-white text-2xl cursor-pointer opacity-60 hover:opacity-100 hover:text-[#4CAF50]" onClick={() => cycle(mLogo.id, -1, mLogo.versions.length)}>▲</span>
                 <div className="flex gap-1.5">{mLogo.versions.map((_, vi) => <div key={vi} className={`w-2 h-2 rounded-full ${vi === (activeIdx[mLogo.id] ?? 0) ? "bg-[#4CAF50]" : "bg-[#444]"}`} />)}</div>
                 <span className="text-white text-2xl cursor-pointer opacity-60 hover:opacity-100 hover:text-[#4CAF50]" onClick={() => cycle(mLogo.id, 1, mLogo.versions.length)}>▼</span>
               </div>
             )}
-            <div className="flex gap-2 mt-4 justify-center">
+            <div className="flex gap-2 mt-2 justify-center">
               <button onClick={() => cropMut.mutate({ logoVersionId: mVer.id })} disabled={cropMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{cropMut.isPending ? "크롭 중..." : "크롭"}</button>
               <button onClick={() => bgMut.mutate({ logoVersionId: mVer.id })} disabled={bgMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{bgMut.isPending ? "제거 중..." : "배경제거"}</button>
               <button onClick={() => svgMut.mutate({ logoVersionId: mVer.id })} disabled={svgMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{svgMut.isPending ? "변환 중..." : "SVG"}</button>
             </div>
-            {cropMut.data && <a href={cropMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-2 underline">크롭 결과 다운로드</a>}
+            {cropMut.data && <a href={cropMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">크롭 결과 다운로드</a>}
             {bgMut.data && <a href={bgMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">배경제거 결과 다운로드</a>}
             {svgMut.data && <a href={svgMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">SVG 다운로드</a>}
-            <div className="text-[#555] text-[11px] mt-4">← → 로고 · ↑ ↓ 버전 · F 즐겨찾기 · Esc 닫기</div>
+            <div className="text-[#555] text-[11px] mt-2">← → 로고 · ↑ ↓ 버전 · F 즐겨찾기 · Esc 닫기</div>
           </div>
         </div>
       )}
