@@ -57,7 +57,8 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
     }, 5000)
     return () => clearInterval(interval)
   }, [chat.isLoading])
-  if (project.isLoading) return <div className="flex items-center justify-center h-screen text-[#666]">로딩 중...</div>
+
+  if (project.isLoading || chatMessages.isLoading) return <div className="flex items-center justify-center h-screen text-[#666]">로딩 중...</div>
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#0a0a0a]">
