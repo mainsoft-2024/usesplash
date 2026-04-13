@@ -6,8 +6,8 @@ import { Providers } from "./providers"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Splash - AI Logo Design",
-  description: "AI 채팅 기반 로고 디자인 플랫폼",
+  title: { default: "Splash", template: "%s | Splash" },
+  description: "AI 채팅으로 로고를 디자인하세요 - Splash",
 }
 
 export default function RootLayout({

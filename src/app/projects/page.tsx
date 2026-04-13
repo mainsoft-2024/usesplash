@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 
@@ -27,9 +28,9 @@ export default function ProjectsPage() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">
+            <Link href="/" className="text-3xl font-bold hover:opacity-90">
               Sp<span className="text-[#4CAF50]">lash</span>
-            </h1>
+            </Link>
             <p className="mt-1 text-sm text-[#666]">AI 로고 디자인 프로젝트</p>
           </div>
           <button

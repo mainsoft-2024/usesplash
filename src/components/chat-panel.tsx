@@ -28,9 +28,20 @@ export function ChatPanel({ projectName, chat }: ChatProps) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {chat.messages.length === 0 && (
           <div className="text-center text-[#555] py-12">
-            <p className="text-lg mb-2">안녕하세요!</p>
-            <p className="text-sm">어떤 로고를 만들어 드릴까요?</p>
-            <p className="text-xs text-[#444] mt-2">브랜드명, 스타일, 색상을 알려주세요</p>
+            <p className="text-lg mb-2">Splash에 오신 것을 환영합니다</p>
+            <p className="text-sm">브랜드명, 스타일, 색상을 알려주시면 AI가 로고를 디자인해 드립니다</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {["픽셀아트 게임 로고", "미니멀 테크 스타트업", "마스코트 캐릭터 로고"].map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => chat.sendMessage(chip)}
+                  className="rounded-full border border-[#333] bg-[#1a1a1a] px-3 py-1 text-xs text-[#bbb] transition-colors hover:border-[#4CAF50] hover:text-white"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

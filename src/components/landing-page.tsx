@@ -63,10 +63,16 @@ export function LandingPage() {
             <a href="#how" className="hover:text-zinc-100">작동 방식</a>
             <a href="#features" className="hover:text-zinc-100">기능</a>
             <a href="#pricing" className="hover:text-zinc-100">요금제</a>
+            <Link href="/projects" className="hover:text-zinc-100">대시보드</Link>
           </nav>
-          <Link href="/login" className="rounded-lg border border-[#2a2a2a] px-4 py-2 text-sm hover:border-[#4CAF50] hover:text-[#4CAF50]">
-            무료로 시작하기
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/login" className="text-sm text-zinc-400 hover:text-zinc-100">
+              로그인
+            </Link>
+            <Link href="/login" className="rounded-lg border border-[#2a2a2a] px-4 py-2 text-sm hover:border-[#4CAF50] hover:text-[#4CAF50]">
+              무료로 시작하기
+            </Link>
+          </div>
         </header>
 
         <section className="fade-in-up grid gap-10 md:grid-cols-2 md:items-center">

@@ -62,7 +62,15 @@ export function GalleryPanel({ logos, isLoading }: GalleryProps) {
   }, [modalIdx, logos, cycle, getVer])
 
   if (isLoading) return <div className="h-full flex items-center justify-center text-[#666]">갤러리 로딩...</div>
-  if (!logos.length) return <div className="h-full flex flex-col items-center justify-center text-[#555]"><p className="text-lg mb-2">아직 로고가 없습니다</p><p className="text-sm">AI와 대화하여 로고를 생성하세요</p></div>
+  if (!logos.length) return <div className="h-full flex items-center justify-center px-6">
+    <div className="relative w-full max-w-md rounded-2xl p-[1px]">
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#2a2a2a] via-[#4CAF50]/50 to-[#2a2a2a] opacity-60 blur-sm animate-pulse" />
+      <div className="relative rounded-2xl border border-[#2a2a2a] bg-[#111] px-6 py-10 text-center text-[#555]">
+        <p className="mb-2 text-lg text-[#ddd]">아직 생성된 로고가 없습니다</p>
+        <p className="text-sm">왼쪽 채팅에서 AI와 대화를 시작하세요</p>
+      </div>
+    </div>
+  </div>
 
   const mLogo = modalIdx !== null ? logos[modalIdx] : null
   const mVer = mLogo ? getVer(mLogo) : null
