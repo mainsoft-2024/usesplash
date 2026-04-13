@@ -28,7 +28,7 @@ export default function ProjectsPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">
-              Logo <span className="text-[#4CAF50]">Studio</span>
+              Sp<span className="text-[#4CAF50]">lash</span>
             </h1>
             <p className="mt-1 text-sm text-[#666]">AI 로고 디자인 프로젝트</p>
           </div>

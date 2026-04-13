@@ -8,7 +8,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm p-8 rounded-2xl bg-[#1a1a1a] border border-[#2a2a2a]">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold">
-            Logo <span className="text-[#4CAF50]">Studio</span>
+            Sp<span className="text-[#4CAF50]">lash</span>
           </h1>
           <p className="text-[#666] text-sm mt-2">AI 로고 디자인 플랫폼</p>
         </div>
