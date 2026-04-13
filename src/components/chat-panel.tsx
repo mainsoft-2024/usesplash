@@ -50,28 +50,43 @@ export function ChatPanel({ projectName, chat }: ChatProps) {
             <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
               msg.role === "user" ? "bg-[#4CAF50] text-white" : "bg-[#1e1e1e] text-[#ddd] border border-[#2a2a2a]"
             }`}>
-              {msg.parts?.map((part: Record<string, unknown>, i: number) => {
-                if (part.type === "text") return <span key={i}>{part.text as string}</span>
-                if (part.type === "tool-invocation") {
-                  const inv = part.toolInvocation as Record<string, unknown>
-                  const toolName = inv.toolName as string
-                  const state = inv.state as string
-                  if (state === "call") {
-                    return <div key={i} className="text-xs text-[#ffb74d] mt-2 flex items-center gap-2"><span className="animate-spin">⚙️</span>{toolName === "generate_batch" ? "로고 생성 중..." : "로고 편집 중..."}</div>
-                  }
-                  if (state === "result") {
-                    const result = inv.result as Record<string, unknown> | undefined
-                    if (toolName === "generate_batch") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ {String(result?.generated ?? 0)}개 로고 생성 완료</div>
-                    if (toolName === "edit_logo") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ 로고 #{String(result?.logoIndex)} v{String(result?.versionNumber)} 편집 완료</div>
-                  }
+              {(() => {
+                const parts = msg.parts as Array<Record<string, unknown>> | undefined
+                if (parts && parts.length > 0) {
+                  return parts.map((part, i) => {
+                    if (part.type === "text") return <span key={i}>{part.text as string}</span>
+                    if (part.type === "tool-invocation") {
+                      const inv = part.toolInvocation as Record<string, unknown>
+                      const toolName = inv.toolName as string
+                      const state = inv.state as string
+                      if (state === "call") {
+                        return <div key={i} className="text-xs text-[#ffb74d] mt-2 flex items-center gap-2"><span className="animate-spin">⚙️</span>{toolName === "generate_batch" ? "로고 생성 중..." : "로고 편집 중..."}</div>
+                      }
+                      if (state === "result") {
+                        const result = inv.result as Record<string, unknown> | undefined
+                        if (toolName === "generate_batch") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ {String(result?.generated ?? 0)}개 로고 생성 완료</div>
+                        if (toolName === "edit_logo") return <div key={i} className="text-xs text-[#81c784] mt-2">✓ 로고 #{String(result?.logoIndex)} v{String(result?.versionNumber)} 편집 완료</div>
+                      }
+                    }
+                    return null
+                  })
                 }
-                return null
-              })}
+                // Fallback: show streaming indicator if parts is empty
+                return <span className="text-[#555]">...</span>
+              })()}
             </div>
           </div>
         ))}
 
-        {chat.isLoading && chat.messages.length > 0 && chat.messages[chat.messages.length - 1]?.role === "user" && (
+        {chat.error && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-red-900/30 border border-red-800/50 text-red-300">
+              오류: {chat.error.message || "채팅 응답에 실패했습니다"}
+            </div>
+          </div>
+        )}
+
+        {chat.isLoading && (
           <div className="flex justify-start">
             <div className="bg-[#1e1e1e] border border-[#2a2a2a] rounded-2xl px-4 py-3">
               <div className="flex gap-1">
