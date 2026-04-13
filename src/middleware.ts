@@ -7,6 +7,7 @@ export default async function middleware(req: NextRequest) {
   const isLoginPage = req.nextUrl.pathname === "/login"
   const isAuthApi = req.nextUrl.pathname.startsWith("/api/auth")
   const isPublic =
+    req.nextUrl.pathname === "/" ||
     isLoginPage ||
     isAuthApi ||
     req.nextUrl.pathname.startsWith("/_next") ||
