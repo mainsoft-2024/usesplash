@@ -75,7 +75,7 @@ export function ChatPanel({ chat }: ChatProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewUrlMapRef = useRef(new Map<File, string>())
   const MAX_FILE_SIZE = 4 * 1024 * 1024
-  const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"]
+  const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic", "image/heif"]
 
   useEffect(() => {
     return () => {
@@ -87,9 +87,13 @@ export function ChatPanel({ chat }: ChatProps) {
   const getPreviewUrl = useCallback((file: File) => {
     const existing = previewUrlMapRef.current.get(file)
     if (existing) return existing
-    const next = URL.createObjectURL(file)
-    previewUrlMapRef.current.set(file, next)
-    return next
+    try {
+      const next = URL.createObjectURL(file)
+      previewUrlMapRef.current.set(file, next)
+      return next
+    } catch {
+      return ""
+    }
   }, [])
 
   const convertFilesToDataURLParts = useCallback(async (files: File[]) => {
@@ -139,8 +143,8 @@ export function ChatPanel({ chat }: ChatProps) {
 
     const validFiles: File[] = []
     files.forEach((file) => {
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        alert("PNG, JPG, WEBP 파일만 첨부할 수 있어요.")
+      if (!file.type.startsWith("image/")) {
+        alert("이미지 파일만 첨부할 수 있어요.")
         return
       }
       if (file.size > MAX_FILE_SIZE) {
@@ -365,10 +369,10 @@ export function ChatPanel({ chat }: ChatProps) {
       <input
         type="file"
         ref={fileInputRef}
-        accept="image/png,image/jpeg,image/webp"
+        accept="image/*"
         multiple
         onChange={handleFileSelect}
-        className="hidden"
+        className="absolute w-0 h-0 overflow-hidden opacity-0"
       />
       <form onSubmit={handleFormSubmit} className="shrink-0 border-t border-[var(--divider)] bg-[var(--bg-primary)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
         <div className={`${THREAD}`}>

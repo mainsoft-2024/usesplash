@@ -62,7 +62,7 @@ export function LandingPage({ session }: { session: any }) {
               <span className="h-2 w-2 rounded-full bg-[var(--text-muted)]" />
               2패널 워크스페이스
             </div>
-            <div className="grid h-[340px] grid-cols-[1fr_1.2fr] gap-3">
+            <div className="grid h-auto md:h-[340px] grid-cols-1 md:grid-cols-[1fr_1.2fr] gap-3">
               <div className="rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-primary)] p-3">
                 <div className="mb-2 h-8 rounded-lg bg-[var(--bg-tertiary)]" />
                 <div className="space-y-2">

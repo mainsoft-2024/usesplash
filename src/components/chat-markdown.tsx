@@ -62,7 +62,7 @@ export function ChatMarkdown({ content }: ChatMarkdownProps) {
     hr: () => <hr className="my-4 border-0 border-t border-[var(--border-primary)]" />,
     table: ({ children }) => (
       <div className="my-3 overflow-x-auto rounded-xl border border-[var(--border-primary)] bg-[var(--bg-deep)]">
-        <table className="w-full min-w-[280px] border-collapse text-left text-[0.8125rem]">{children}</table>
+        <table className="w-full min-w-0 border-collapse text-left text-[0.8125rem]">{children}</table>
       </div>
     ),
     thead: ({ children }) => <thead className="bg-[var(--bg-secondary)] text-[var(--text-secondary)]">{children}</thead>,

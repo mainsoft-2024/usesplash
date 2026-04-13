@@ -100,19 +100,19 @@ export default function PricingPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
-                <th className="px-6 py-4 text-left font-medium text-[var(--text-secondary)]">기능</th>
-                <th className="px-6 py-4 text-center font-medium">Free</th>
-                <th className="px-6 py-4 text-center font-medium text-[var(--accent-green)]">Pro</th>
-                <th className="px-6 py-4 text-center font-medium">Enterprise</th>
+                <th className="px-3 sm:px-6 py-4 text-left font-medium text-[var(--text-secondary)]">기능</th>
+                <th className="px-3 sm:px-6 py-4 text-center font-medium">Free</th>
+                <th className="px-3 sm:px-6 py-4 text-center font-medium text-[var(--accent-green)]">Pro</th>
+                <th className="px-3 sm:px-6 py-4 text-center font-medium">Enterprise</th>
               </tr>
             </thead>
             <tbody>
               {comparison.map((row, i) => (
                 <tr key={row.feature} className={i < comparison.length - 1 ? "border-b border-[var(--border-primary)]" : ""}>
-                  <td className="px-6 py-3 text-[var(--text-secondary)]">{row.feature}</td>
-                  <td className="px-6 py-3 text-center">{row.free}</td>
-                  <td className="px-6 py-3 text-center">{row.pro}</td>
-                  <td className="px-6 py-3 text-center">{row.enterprise}</td>
+                  <td className="px-3 sm:px-6 py-3 text-[var(--text-secondary)]">{row.feature}</td>
+                  <td className="px-3 sm:px-6 py-3 text-center">{row.free}</td>
+                  <td className="px-3 sm:px-6 py-3 text-center">{row.pro}</td>
+                  <td className="px-3 sm:px-6 py-3 text-center">{row.enterprise}</td>
                 </tr>
               ))}
             </tbody>

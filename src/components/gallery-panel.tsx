@@ -70,7 +70,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
   }, [modalIdx, logos, cycle, getVer])
 
   if (isLoading) return <div className="h-full flex-1 overflow-y-auto p-4">
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
       {Array.from({ length: 6 }).map((_, idx) => (
         <div key={idx} className="rounded-2xl border border-[#2a2a2a] bg-[#1b1b1b] overflow-hidden animate-pulse">
           <div className="aspect-[4/3] bg-[#2a2a2a]" />
@@ -123,7 +123,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
           {(toolActivity?.type === "generated" && toolActivity.generated > 0) && (
             <div className="col-span-full mb-3 px-3 py-2 bg-[#1a2e1a] border border-[#4CAF50]/30 rounded-lg">
               <div className="text-xs text-[#81c784]">✓ {toolActivity.generated}개 새 로고가 추가되었습니다</div>
