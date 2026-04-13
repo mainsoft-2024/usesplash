@@ -1,24 +1,16 @@
-import { getToken } from "next-auth/jwt"
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-export default async function middleware(req: NextRequest) {
-  const secret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET
-  const token = await getToken({ req, secret })
-  const isLoggedIn = !!token
+export function middleware(req: NextRequest) {
+  // Auth is handled at the page level using auth() server function.
+  // Middleware only handles basic routing.
   const isLoginPage = req.nextUrl.pathname === "/login"
-  const isAuthApi = req.nextUrl.pathname.startsWith("/api/auth")
-  const isPublic =
-    req.nextUrl.pathname === "/" ||
-    isLoginPage ||
-    isAuthApi ||
-    req.nextUrl.pathname.startsWith("/_next") ||
-    req.nextUrl.pathname === "/favicon.ico"
+  const sessionToken =
+    req.cookies.get("authjs.session-token")?.value ??
+    req.cookies.get("__Secure-authjs.session-token")?.value
 
-  if (!isLoggedIn && !isPublic) {
-    return NextResponse.redirect(new URL("/login", req.url))
-  }
-
-  if (isLoggedIn && isLoginPage) {
+  // Redirect logged-in users away from /login
+  if (sessionToken && isLoginPage) {
     return NextResponse.redirect(new URL("/projects", req.url))
   }
 
@@ -26,5 +18,5 @@ export default async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
 }
