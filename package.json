@@ -7,7 +7,8 @@
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backfill-usage": "npx tsx scripts/backfill-usage.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.160",
@@ -32,6 +33,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
+    "recharts": "^3.8.1",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "sharp": "^0.34.5",

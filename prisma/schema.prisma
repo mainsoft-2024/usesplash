@@ -18,6 +18,7 @@ model User {
   sessions      Session[]
   projects      Project[]
   subscription  Subscription?
+  usageLogs     UsageLog[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -62,6 +63,7 @@ model Project {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   logos       Logo[]
   chatMessages ChatMessage[]
+  usageLogs    UsageLog[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   @@index([userId])
@@ -118,4 +120,19 @@ model Subscription {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+
+model UsageLog {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  type      String   // "generate" | "edit"
+  count     Int      @default(1)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, type])
 }

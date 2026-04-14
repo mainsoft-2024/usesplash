@@ -5,6 +5,8 @@ import { chatRouter } from "./chat"
 import { generationRouter } from "./generation"
 import { exportRouter } from "./export"
 import { subscriptionRouter } from "./subscription"
+import { adminRouter } from "./admin"
+import { usageRouter } from "./usage"
 
 export const appRouter = router({
   project: projectRouter,
@@ -13,6 +15,8 @@ export const appRouter = router({
   generation: generationRouter,
   export: exportRouter,
   subscription: subscriptionRouter,
+  admin: adminRouter,
+  usage: usageRouter,
 })
 
 export type AppRouter = typeof appRouter

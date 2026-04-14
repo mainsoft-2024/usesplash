@@ -93,6 +93,14 @@ export const generationRouter = router({
           update: { dailyGenerations: { increment: generatedLogos.length } },
           create: { userId, dailyGenerations: generatedLogos.length },
         })
+        await ctx.prisma.usageLog.create({
+          data: {
+            userId,
+            projectId: input.projectId,
+            type: "generate",
+            count: generatedLogos.length,
+          },
+        })
       }
 
       return { generated: generatedLogos.length, logos: generatedLogos }
@@ -158,6 +166,14 @@ export const generationRouter = router({
         where: { userId },
         update: { dailyGenerations: { increment: 1 } },
         create: { userId, dailyGenerations: 1 },
+      })
+      await ctx.prisma.usageLog.create({
+        data: {
+          userId,
+          projectId: sourceVersion.logo.projectId,
+          type: "edit",
+          count: 1,
+        },
       })
 
       return {

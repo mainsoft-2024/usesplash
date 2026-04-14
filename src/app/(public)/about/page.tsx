@@ -1,6 +1,15 @@
 import type { Metadata } from "next"
 
-export const metadata: Metadata = { title: "소개" }
+export const metadata: Metadata = {
+  title: "소개",
+  description: "Splash는 AI와의 자연어 대화를 통해 누구나 전문가 수준의 로고를 만들 수 있는 디자인 플랫폼입니다.",
+  alternates: { canonical: "https://usesplash.vercel.app/about" },
+  openGraph: {
+    title: "소개 | Splash",
+    description: "Splash는 AI와의 자연어 대화를 통해 누구나 전문가 수준의 로고를 만들 수 있는 디자인 플랫폼입니다.",
+    url: "https://usesplash.vercel.app/about",
+  },
+}
 
 export default function AboutPage() {
   return (

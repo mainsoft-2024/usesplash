@@ -1,7 +1,16 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
-export const metadata: Metadata = { title: "요금제" }
+export const metadata: Metadata = {
+  title: "요금제",
+  description: "Splash 무료 플랜부터 Pro, Enterprise까지. AI 로고 디자인 서비스 요금을 확인하세요.",
+  alternates: { canonical: "https://usesplash.vercel.app/pricing" },
+  openGraph: {
+    title: "요금제 | Splash",
+    description: "Splash 무료 플랜부터 Pro, Enterprise까지. AI 로고 디자인 서비스 요금을 확인하세요.",
+    url: "https://usesplash.vercel.app/pricing",
+  },
+}
 
 const plans = [
   {

@@ -9,7 +9,16 @@ export const projectRouter = router({
       include: {
         _count: { select: { logos: true } },
         logos: {
-          include: { _count: { select: { versions: true } } },
+          orderBy: { orderIndex: "asc" },
+          take: 3,
+          include: {
+            _count: { select: { versions: true } },
+            versions: {
+              orderBy: { versionNumber: "desc" },
+              take: 1,
+              select: { imageUrl: true },
+            },
+          },
         },
       },
     })
@@ -21,6 +30,9 @@ export const projectRouter = router({
         (sum, l) => sum + Math.max(0, l._count.versions - 1),
         0,
       ),
+      thumbnails: p.logos
+        .map((l) => l.versions[0]?.imageUrl)
+        .filter((url): url is string => !!url),
       logos: undefined,
       _count: undefined,
     }))

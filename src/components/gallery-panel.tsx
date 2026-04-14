@@ -142,7 +142,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
               </div>
             </div>
           )}
-          {logos.map((logo, idx) => {
+          {logos.filter((logo) => logo.versions.length > 0).map((logo, idx) => {
             const ver = getVer(logo)
             const ai = activeIdx[logo.id] ?? 0
             const isRev = ai > 0

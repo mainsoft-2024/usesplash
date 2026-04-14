@@ -5,6 +5,83 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { LoadingScreen } from "@/components/spinners"
+import { UsageStats } from "@/components/usage-stats"
+
+function ThumbnailGrid({ thumbnails }: { thumbnails: string[] }) {
+  if (thumbnails.length === 0) {
+    return (
+      <div className="flex h-[180px] items-center justify-center bg-[var(--bg-primary)]">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="h-8 w-8 text-[var(--text-tertiary)]/40"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
+          <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+          <circle cx="9" cy="10" r="1.4" />
+          <path d="M6.5 16l4-4 2.5 2.5 2-2 2.5 3.5" />
+        </svg>
+      </div>
+    )
+  }
+
+  if (thumbnails.length === 1) {
+    return (
+      <div className="h-[180px] overflow-hidden">
+        <img
+          src={thumbnails[0]}
+          alt=""
+          loading="lazy"
+          className="h-full w-full animate-[fadeIn_300ms_ease-out] object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      </div>
+    )
+  }
+
+  if (thumbnails.length === 2) {
+    return (
+      <div className="grid h-[180px] grid-cols-2 gap-px overflow-hidden bg-[var(--bg-primary)]">
+        {thumbnails.map((url) => (
+          <div key={url} className="overflow-hidden">
+            <img
+              src={url}
+              alt=""
+              loading="lazy"
+              className="h-full w-full animate-[fadeIn_300ms_ease-out] object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid h-[180px] grid-cols-5 gap-px overflow-hidden bg-[var(--bg-primary)]">
+      <div className="col-span-3 overflow-hidden">
+        <img
+          src={thumbnails[0]}
+          alt=""
+          loading="lazy"
+          className="h-full w-full animate-[fadeIn_300ms_ease-out] object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      </div>
+      <div className="col-span-2 grid grid-rows-2 gap-px overflow-hidden">
+        {thumbnails.slice(1, 3).map((url) => (
+          <div key={url} className="overflow-hidden">
+            <img
+              src={url}
+              alt=""
+              loading="lazy"
+              className="h-full w-full animate-[fadeIn_300ms_ease-out] object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function ProjectsPage() {
   const router = useRouter()
@@ -52,6 +129,10 @@ export default function ProjectsPage() {
           >
             + 새 프로젝트
           </button>
+        </div>
+
+        <div className="mb-8">
+          <UsageStats />
         </div>
 
         {showNew && (
@@ -180,9 +261,27 @@ export default function ProjectsPage() {
             </button>
           </div>
         ) : !projects.data?.length ? (
-          <div className="py-20 text-center text-[var(--text-muted)]">
-            <p className="mb-2 text-lg">아직 프로젝트가 없습니다</p>
-            <p className="text-sm">새 프로젝트를 만들어 로고 디자인을 시작하세요</p>
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-primary)] bg-[var(--bg-secondary)] py-20">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-10 w-10 text-[var(--text-tertiary)]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+              <circle cx="9" cy="10" r="1.4" />
+              <path d="M6.5 16l4-4 2.5 2.5 2-2 2.5 3.5" />
+            </svg>
+            <p className="mt-4 text-lg text-[var(--text-secondary)]">아직 프로젝트가 없습니다</p>
+            <p className="mt-1 text-sm text-[var(--text-tertiary)]">새 프로젝트를 만들어 로고 디자인을 시작하세요</p>
+            <button
+              onClick={() => setShowNew(true)}
+              className="mt-6 rounded-lg bg-[var(--accent-green)] px-4 py-2 font-medium text-white transition-colors hover:bg-[var(--accent-green-hover)]"
+            >
+              + 새 프로젝트
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -191,7 +290,7 @@ export default function ProjectsPage() {
                 key={project.id}
                 role="article"
                 tabIndex={0}
-                className="group relative cursor-pointer rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-5 transition-all hover:border-[var(--accent-green)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-green)]"
+                className="group cursor-pointer overflow-hidden rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] transition-all hover:border-[var(--accent-green)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-green)]"
                 onClick={() => router.push(`/projects/${project.id}`)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -200,33 +299,41 @@ export default function ProjectsPage() {
                   }
                 }}
               >
-                <button
-                  aria-label="프로젝트 삭제"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setDeleteConfirm(project.id)
-                  }}
-                  className="absolute right-3 top-3 text-lg text-[var(--text-muted)] opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
-                  title="삭제"
-                >
-                  ×
-                </button>
-                <h3 className="mb-1 text-lg font-semibold">{project.name}</h3>
-                {project.description && (
-                  <p className="mb-3 line-clamp-2 text-sm text-[var(--text-secondary)]">{project.description}</p>
-                )}
-                <div className="mt-3 flex gap-2">
-                  <span className="rounded-md bg-[var(--badge-purple-bg)] px-2 py-1 text-xs font-medium text-[var(--accent-purple)]">
-                    {new Date(project.createdAt).toLocaleDateString("ko")}
-                  </span>
-                  <span className="rounded-md bg-[var(--badge-green-bg)] px-2 py-1 text-xs font-medium text-[var(--accent-green-light)]">
-                    {project.logoCount} logos
-                  </span>
-                  {project.revisionCount > 0 && (
-                    <span className="rounded-md bg-[var(--badge-yellow-bg)] px-2 py-1 text-xs font-medium text-[var(--accent-yellow)]">
-                      {project.revisionCount} revisions
-                    </span>
+                <ThumbnailGrid thumbnails={project.thumbnails} />
+                <div className="p-5">
+                  <div className="flex items-start gap-2">
+                    <h3 className="min-w-0 flex-1 truncate text-lg font-medium">{project.name}</h3>
+                    <button
+                      aria-label="프로젝트 삭제"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteConfirm(project.id)
+                      }}
+                      className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-[var(--text-secondary)] opacity-0 transition hover:bg-[var(--bg-tertiary)] hover:text-red-500 group-hover:opacity-100"
+                      title="삭제"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      >
+                        <path d="M4 7h16" />
+                        <path d="M9 7V5h6v2" />
+                        <path d="M8 7l.7 11h6.6L16 7" />
+                        <path d="M10.5 10.5v5" />
+                        <path d="M13.5 10.5v5" />
+                      </svg>
+                    </button>
+                  </div>
+                  {project.description && (
+                    <p className="mt-1 line-clamp-1 text-sm text-[var(--text-secondary)]">{project.description}</p>
                   )}
+                  <p className="mt-3 text-xs text-[var(--text-tertiary)]">
+                    {project.logoCount}개의 로고 · {project.revisionCount}개의 버전 · {new Date(project.createdAt).toLocaleDateString("ko")}
+                  </p>
                 </div>
               </div>
             ))}

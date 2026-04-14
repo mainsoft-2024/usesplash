@@ -133,6 +133,9 @@ export async function POST(req: Request) {
               update: { dailyGenerations: { increment: logos.length } },
               create: { userId, dailyGenerations: logos.length },
             })
+            await prisma.usageLog.create({
+              data: { userId, projectId, type: "generate", count: logos.length },
+            })
           }
 
           if (logos.length === count) {
@@ -227,6 +230,9 @@ export async function POST(req: Request) {
             where: { userId },
             update: { dailyGenerations: { increment: 1 } },
             create: { userId, dailyGenerations: 1 },
+          })
+          await prisma.usageLog.create({
+            data: { userId, projectId, type: "edit", count: 1 },
           })
 
           return {
