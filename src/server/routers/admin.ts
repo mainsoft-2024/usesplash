@@ -114,12 +114,12 @@ export const adminRouter = router({
                   orderIndex: true,
                   versions: {
                     orderBy: { versionNumber: "desc" },
-                    take: 1,
                     select: {
                       id: true,
                       imageUrl: true,
                       versionNumber: true,
                       createdAt: true,
+                      editPrompt: true,
                     },
                   },
                 },

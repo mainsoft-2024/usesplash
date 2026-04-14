@@ -146,25 +146,65 @@ export default function AdminUserDetailPage(props: PageProps) {
                   </div>
 
                   <div className="mt-4">
-                    <p className="mb-2 text-xs text-[var(--text-tertiary)]">로고 썸네일</p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                    <p className="mb-2 text-xs text-[var(--text-tertiary)]">로고 목록</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {project.logos.length === 0 ? (
                         <p className="col-span-full text-sm text-[var(--text-secondary)]">
                           생성된 로고가 없습니다.
                         </p>
                       ) : (
                         project.logos.map((logo) => {
-                          const latestVersion = logo.versions[logo.versions.length - 1] ?? logo.versions[0]
-
-                          if (!latestVersion) return null
+                          const latestVersion = logo.versions[0]
+                          const shortId = logo.id.length > 12 ? `${logo.id.slice(0, 12)}...` : logo.id
 
                           return (
-                            <img
+                            <article
                               key={logo.id}
-                              src={latestVersion.imageUrl}
-                              alt="로고 썸네일"
-                              className="h-24 w-full rounded-lg object-cover"
-                            />
+                              className="rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] p-3"
+                            >
+                              {latestVersion ? (
+                                <img
+                                  src={latestVersion.imageUrl}
+                                  alt="최신 로고 썸네일"
+                                  className="h-36 w-full rounded-lg object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-36 w-full items-center justify-center rounded-lg bg-[var(--bg-secondary)] text-sm text-[var(--text-secondary)]">
+                                  버전 이미지가 없습니다.
+                                </div>
+                              )}
+
+                              <p className="mt-2 text-xs font-mono text-[var(--text-tertiary)]">
+                                로고 ID: {shortId}
+                              </p>
+
+                              <div className="mt-2 space-y-2">
+                                {logo.versions.length === 0 ? (
+                                  <p className="text-xs text-[var(--text-secondary)]">버전 기록이 없습니다.</p>
+                                ) : (
+                                  logo.versions.map((version) => (
+                                    <div
+                                      key={version.id}
+                                      className="rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-2"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <span className="rounded-full bg-[var(--accent-green)]/20 px-2 py-0.5 text-xs text-[var(--accent-green)]">
+                                          v{version.versionNumber}
+                                        </span>
+                                        <span className="text-[10px] text-[var(--text-tertiary)]">
+                                          {formatDate(version.createdAt)}
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                                        {version.versionNumber === 1
+                                          ? "원본 생성"
+                                          : version.editPrompt?.trim() || "수정"}
+                                      </p>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </article>
                           )
                         })
                       )}
