@@ -34,12 +34,6 @@ export const generationRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Daily generation limit reached" })
       }
 
-      // Get current max orderIndex
-      const lastLogo = await ctx.prisma.logo.findFirst({
-        where: { projectId: input.projectId },
-        orderBy: { orderIndex: "desc" },
-      })
-      let orderIndex = (lastLogo?.orderIndex ?? -1) + 1
 
       const generatedLogos: Array<{ logoId: string; versionId: string; imageUrl: string; orderIndex: number }> = []
 
@@ -49,13 +43,20 @@ export const generationRouter = router({
           if (!result) continue
 
           // Create logo + version in DB
-          const logo = await ctx.prisma.logo.create({
-            data: {
-              projectId: input.projectId,
-              orderIndex: orderIndex++,
-              prompt: input.prompt,
-              aspectRatio: input.aspectRatio,
-            },
+          const logo = await ctx.prisma.$transaction(async (tx) => {
+            const lastLogo = await tx.logo.findFirst({
+              where: { projectId: input.projectId },
+              orderBy: { orderIndex: "desc" },
+            })
+            const nextIndex = (lastLogo?.orderIndex ?? -1) + 1
+            return tx.logo.create({
+              data: {
+                projectId: input.projectId,
+                orderIndex: nextIndex,
+                prompt: input.prompt,
+                aspectRatio: input.aspectRatio,
+              },
+            })
           })
 
           const s3Key = getStorageKey(userId, input.projectId, logo.id, "v1")

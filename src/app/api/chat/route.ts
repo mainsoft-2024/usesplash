@@ -85,31 +85,23 @@ export async function POST(req: Request) {
         execute: async ({ prompt, count, aspectRatio }) => {
           const logos: Array<{ logoId: string; orderIndex: number; imageUrl: string }> = []
 
-          const lastLogo = await prisma.logo.findFirst({
-            where: { projectId },
-            orderBy: { orderIndex: "desc" },
-          })
-          let startIndex = (lastLogo?.orderIndex ?? -1) + 1
-
-          // Generate all images in parallel
-          const generatePromises = Array.from({ length: count }, (_, i) =>
-            withGeminiConcurrency(() => generateLogoImage(prompt, { aspectRatio }))
-              .then(result => ({ index: i, result, error: null as string | null }))
-              .catch(e => ({ index: i, result: null as any, error: e instanceof Error ? e.message : "Unknown error" }))
-          )
-          const results = await Promise.all(generatePromises)
-
-          // Save successful results to DB sequentially (to maintain order)
-          for (const { index, result, error } of results) {
-            if (!result) {
-              console.error(`Generation ${index + 1}/${count}: failed -`, error || "null result")
-              continue
-            }
-
+          for (let i = 0; i < count; i++) {
             try {
-              const orderIndex = startIndex + index
-              const logo = await prisma.logo.create({
-                data: { projectId, orderIndex, prompt, aspectRatio },
+              const result = await withGeminiConcurrency(() => generateLogoImage(prompt, { aspectRatio }))
+              if (!result) {
+                console.error(`Generation ${i + 1}/${count}: failed - null result`)
+                continue
+              }
+
+              const logo = await prisma.$transaction(async (tx) => {
+                const lastLogo = await tx.logo.findFirst({
+                  where: { projectId },
+                  orderBy: { orderIndex: "desc" },
+                })
+                const orderIndex = (lastLogo?.orderIndex ?? -1) + 1
+                return tx.logo.create({
+                  data: { projectId, orderIndex, prompt, aspectRatio },
+                })
               })
 
               const s3Key = getStorageKey(userId, projectId, logo.id, "v1")
@@ -119,10 +111,10 @@ export async function POST(req: Request) {
                 data: { logoId: logo.id, versionNumber: 1, imageUrl, s3Key },
               })
 
-              logos.push({ logoId: logo.id, orderIndex, imageUrl })
-              console.log(`Generation ${index + 1}/${count}: success, logoId=${logo.id}`)
+              logos.push({ logoId: logo.id, orderIndex: logo.orderIndex, imageUrl })
+              console.log(`Generation ${i + 1}/${count}: success, logoId=${logo.id}`)
             } catch (e) {
-              console.error(`Generation ${index + 1}/${count} save failed:`, e)
+              console.error(`Generation ${i + 1}/${count} failed:`, e)
             }
           }
 

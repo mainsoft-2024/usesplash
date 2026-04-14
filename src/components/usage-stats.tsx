@@ -1,16 +1,52 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts"
+import dynamic from "next/dynamic"
 import { trpc } from "@/lib/trpc/client"
+
+const RechartsBar = dynamic(
+  () => import("recharts").then((mod) => {
+    const { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } = mod
+    function Chart({ data }: { data: Array<{ label: string; count: number }> }) {
+      return (
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={data}>
+            <CartesianGrid stroke="#333" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: "#888", fontSize: 12 }}
+              axisLine={{ stroke: "#333" }}
+              tickLine={{ stroke: "#333" }}
+            />
+            <YAxis
+              tick={{ fill: "#888", fontSize: 12 }}
+              axisLine={{ stroke: "#333" }}
+              tickLine={{ stroke: "#333" }}
+              allowDecimals={false}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#1a1a1a",
+                border: "1px solid #333",
+                borderRadius: "10px",
+                color: "#fff",
+              }}
+              labelStyle={{ color: "#fff" }}
+              cursor={{ fill: "rgba(76, 175, 80, 0.15)" }}
+            />
+            <Bar dataKey="count" fill="var(--accent-green)" radius={[6, 6, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      )
+    }
+    Chart.displayName = "RechartsBar"
+    return Chart
+  }),
+  {
+    ssr: false,
+    loading: () => <div className="h-[200px] animate-pulse rounded-xl bg-[var(--bg-primary)]" />,
+  },
+)
 
 type RangeDays = 7 | 30 | 90
 
@@ -130,34 +166,7 @@ export function UsageStats() {
       </div>
 
       <div className="h-[200px]">
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={data}>
-            <CartesianGrid stroke="#333" vertical={false} />
-            <XAxis
-              dataKey="label"
-              tick={{ fill: "#888", fontSize: 12 }}
-              axisLine={{ stroke: "#333" }}
-              tickLine={{ stroke: "#333" }}
-            />
-            <YAxis
-              tick={{ fill: "#888", fontSize: 12 }}
-              axisLine={{ stroke: "#333" }}
-              tickLine={{ stroke: "#333" }}
-              allowDecimals={false}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "#1a1a1a",
-                border: "1px solid #333",
-                borderRadius: "10px",
-                color: "#fff",
-              }}
-              labelStyle={{ color: "#fff" }}
-              cursor={{ fill: "rgba(76, 175, 80, 0.15)" }}
-            />
-            <Bar dataKey="count" fill="var(--accent-green)" radius={[6, 6, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        <RechartsBar data={data} />
       </div>
     </section>
   )
