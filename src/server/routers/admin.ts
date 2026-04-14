@@ -166,4 +166,29 @@ export const adminRouter = router({
         todayGenerations: todayUsage._sum.count ?? 0,
       }
     }),
+
+  getPlatformStats: adminProcedure.query(async ({ ctx }) => {
+    const now = new Date()
+    const todayMidnightUTC = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    )
+
+    const [totalUsers, totalProjects, totalGenerationsAgg, activeUsersTodayList] = await Promise.all([
+      ctx.prisma.user.count(),
+      ctx.prisma.project.count(),
+      ctx.prisma.usageLog.aggregate({ _sum: { count: true } }),
+      ctx.prisma.usageLog.findMany({
+        where: { createdAt: { gte: todayMidnightUTC } },
+        select: { userId: true },
+        distinct: ["userId"],
+      }),
+    ])
+
+    return {
+      totalUsers,
+      totalProjects,
+      totalGenerations: totalGenerationsAgg._sum.count ?? 0,
+      activeUsersToday: activeUsersTodayList.length,
+    }
+  }),
 })

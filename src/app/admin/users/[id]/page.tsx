@@ -1,12 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { use, useMemo, useState } from "react"
+import { use, useEffect, useMemo, useState } from "react"
 import { trpc } from "@/lib/trpc/client"
 
 type PageProps = {
   params: Promise<{ id: string }>
 }
+
+type SubscriptionTier = "free" | "pro" | "enterprise"
 
 function formatDate(value: string | Date) {
   return new Date(value).toLocaleDateString("ko-KR")
@@ -20,6 +22,49 @@ export default function AdminUserDetailPage(props: PageProps) {
     userId: params.id,
   })
 
+  const utils = trpc.useUtils()
+  const currentTier = (data?.subscription?.tier ?? "free") as SubscriptionTier
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>("free")
+
+  useEffect(() => {
+    setSelectedTier(currentTier)
+  }, [currentTier])
+
+  const updateTierMutation = trpc.subscription.adminUpdateTier.useMutation({
+    onSuccess: async () => {
+      await utils.admin.getUserDetail.invalidate({ userId: params.id })
+    },
+    onError: () => {
+      setSelectedTier(currentTier)
+      window.alert("요금제 변경에 실패했습니다. 다시 시도해주세요.")
+    },
+  })
+
+  const handleTierChange = async (nextTier: SubscriptionTier) => {
+    if (!data) return
+
+    const tierOrder: Record<SubscriptionTier, number> = {
+      free: 0,
+      pro: 1,
+      enterprise: 2,
+    }
+
+    const isDowngrade = tierOrder[nextTier] < tierOrder[currentTier]
+    const needsConfirm = nextTier === "enterprise" || isDowngrade
+
+    if (needsConfirm) {
+      const confirmed = window.confirm(
+        `요금제를 ${currentTier.toUpperCase()}에서 ${nextTier.toUpperCase()}로 변경할까요?`,
+      )
+      if (!confirmed) {
+        setSelectedTier(currentTier)
+        return
+      }
+    }
+
+    setSelectedTier(nextTier)
+    await updateTierMutation.mutateAsync({ userId: data.id, tier: nextTier })
+  }
   const projects = useMemo(() => {
     if (!data?.projects) return []
 
@@ -91,9 +136,40 @@ export default function AdminUserDetailPage(props: PageProps) {
               <span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs font-medium text-blue-300">
                 권한: {data.role}
               </span>
-              <span className="rounded-full bg-[var(--accent-green)]/20 px-3 py-1 text-xs font-medium text-[var(--accent-green)]">
-                요금제: {data.subscription?.tier ?? "free"}
-              </span>
+              <div>
+                <p className="text-xs text-[var(--text-tertiary)]">요금제 관리</p>
+                <div className="relative inline-block">
+                  <select
+                    value={selectedTier}
+                    onChange={(event) => {
+                      void handleTierChange(event.target.value as SubscriptionTier)
+                    }}
+                    disabled={updateTierMutation.isPending}
+                    className={`appearance-none cursor-pointer rounded-lg border border-[var(--border-primary)] bg-transparent py-1 pl-3 pr-8 text-sm font-medium text-white transition-colors hover:border-[var(--accent-green)] focus:border-[var(--accent-green)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-green)] ${
+                      updateTierMutation.isPending ? "cursor-wait opacity-50" : ""
+                    }`}
+                  >
+                    <option value="free" className="bg-[var(--bg-secondary)] text-white">
+                      무료
+                    </option>
+                    <option value="pro" className="bg-[var(--bg-secondary)] text-white">
+                      프로
+                    </option>
+                    <option value="enterprise" className="bg-[var(--bg-secondary)] text-white">
+                      엔터프라이즈
+                    </option>
+                  </select>
+                  <svg
+                    className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
 
