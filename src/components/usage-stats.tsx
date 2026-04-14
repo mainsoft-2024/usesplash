@@ -82,6 +82,15 @@ export function UsageStats() {
   const usageQuery = trpc.usage.getMyUsageStats.useQuery()
   const chartQuery = trpc.usage.getDailyChart.useQuery({ days })
 
+  const chartData = useMemo(
+    () =>
+      (chartQuery.data ?? []).map((item) => ({
+        ...item,
+        label: formatDateLabel(item.date),
+      })),
+    [chartQuery.data],
+  )
+
   if (usageQuery.isLoading || chartQuery.isLoading) {
     return <UsageStatsSkeleton />
   }
@@ -95,15 +104,6 @@ export function UsageStats() {
   }
 
   const { total, today, remaining, tier, dailyLimit } = usageQuery.data
-  const data = useMemo(
-    () =>
-      chartQuery.data.map((item) => ({
-        ...item,
-        label: formatDateLabel(item.date),
-      })),
-    [chartQuery.data],
-  )
-
   const isUnlimited = dailyLimit < 0
   const progressPercent = isUnlimited
     ? 100
@@ -166,7 +166,7 @@ export function UsageStats() {
       </div>
 
       <div className="h-[200px]">
-        <RechartsBar data={data} />
+        <RechartsBar data={chartData} />
       </div>
     </section>
   )
