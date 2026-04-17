@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Logo Studio</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0e0e0e; margin: 0; padding: 40px 20px; color: white; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { font-size: 32px; margin: 0 0 6px; }
+    .header h1 .accent { color: #4CAF50; }
+    .header p { color: #666; font-size: 13px; margin: 0; }
+    .projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+    .project-card {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 14px;
+      padding: 24px; cursor: pointer; transition: all .2s;
+      text-decoration: none; color: white; display: block;
+    }
+    .project-card:hover { border-color: #4CAF50; transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+    .project-card .name { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .project-card .desc { color: #888; font-size: 13px; margin-bottom: 16px; }
+    .project-card .meta { display: flex; gap: 12px; }
+    .project-card .tag {
+      padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    }
+    .tag.date { background: #1e1e2e; color: #8888cc; }
+    .tag.count { background: #1e2e1e; color: #81c784; }
+    .tag.rev { background: #2e2e1e; color: #cccc66; }
+    .empty { text-align: center; color: #444; padding: 60px; font-size: 15px; }
+    .new-card {
+      background: transparent; border: 2px dashed #333; border-radius: 14px;
+      padding: 24px; display: flex; align-items: center; justify-content: center;
+      min-height: 160px; color: #555; font-size: 15px; cursor: default;
+    }
+    .new-card span { font-size: 13px; }
+  </style>
+</head>
+<body>
+<div class="header">
+  <h1>Logo <span class="accent">Studio</span></h1>
+  <p>All logo design projects</p>
+</div>
+<div class="projects" id="projects"></div>
+<script>
+async function load() {
+  const container = document.getElementById("projects");
+  try {
+    const res = await fetch("projects.json?t=" + Date.now());
+    const projects = await res.json();
+    if (!projects.length) { container.innerHTML = '<div class="empty">No projects yet.</div>'; return; }
+    projects.sort((a, b) => b.created.localeCompare(a.created));
+    projects.forEach(p => {
+      const a = document.createElement("a");
+      a.className = "project-card";
+      a.href = p.id + "/preview.html";
+      a.innerHTML = '<div class="name">' + p.name + '</div>'
+        + '<div class="desc">' + p.description + '</div>'
+        + '<div class="meta">'
+        + '<span class="tag date">' + p.created + '</span>'
+        + '<span class="tag count">' + p.originals + ' originals</span>'
+        + (p.revisions > 0 ? '<span class="tag rev">' + p.revisions + ' revisions</span>' : '')
+        + '</div>';
+      container.appendChild(a);
+    });
+    // Add placeholder
+    const ph = document.createElement("div");
+    ph.className = "new-card";
+    ph.innerHTML = '<span>New projects will appear here</span>';
+    container.appendChild(ph);
+  } catch (e) {
+    container.innerHTML = '<div class="empty">Could not load projects.json</div>';
+  }
+}
+load();
+</script>
+</body>
+</html>

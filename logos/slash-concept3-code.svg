@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <defs>
+    <style>
+      .letter { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 68px; font-weight: 500; fill: #222222; }
+      .slash { font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 68px; font-weight: 500; fill: #FF3B30; }
+      .cursor { fill: #222222; }
+    </style>
+  </defs>
+  <text x="20" y="85" class="letter">s</text>
+  <text x="58" y="85" class="slash">/</text>
+  <text x="92" y="85" class="letter">ash</text>
+  <rect x="280" y="22" width="3" height="60" rx="1" class="cursor">
+    <animate attributeName="opacity" values="1;0;1" dur="1.2s" repeatCount="indefinite" />
+  </rect>
+</svg>

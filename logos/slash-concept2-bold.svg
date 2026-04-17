@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <defs>
+    <style>
+      .letter { font-family: 'Helvetica Neue', 'Arial', sans-serif; font-size: 80px; font-weight: 700; fill: #000000; }
+    </style>
+  </defs>
+  <text x="20" y="92" class="letter">s</text>
+  <rect x="78" y="18" width="42" height="80" rx="2" fill="#000000" transform="skewX(-18)" />
+  <text x="120" y="92" class="letter">ash</text>
+</svg>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>만화제면소 Symbol Logo Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #111; padding: 20px; margin: 0; color: white; padding-bottom: 80px; }
+    h1 { text-align: center; margin-bottom: 6px; font-size: 28px; }
+    .sub { text-align: center; color: #666; margin-bottom: 20px; font-size: 12px; }
+    .status { text-align: center; color: #ffb74d; margin-bottom: 16px; font-size: 13px; }
+    .status.done { color: #4CAF50; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; max-width: 1500px; margin: 0 auto; }
+    .card-group { background: #1e1e1e; border-radius: 12px; overflow: hidden; transition: box-shadow 0.2s; }
+    .card-group:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    .card-group.has-rev { border: 1px solid #333; }
+    .card-viewer { position: relative; background: white; cursor: pointer; aspect-ratio: 1/1; overflow: hidden; }
+    .card-viewer img { width: 100%; height: 100%; object-fit: contain; }
+    .vpill { position: absolute; top: 8px; left: 8px; padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: .5px; pointer-events: none; }
+    .vpill.orig { background: rgba(0,0,0,.6); color: #ccc; }
+    .vpill.rev { background: rgba(46,125,50,.85); color: #fff; }
+    .cnav { position: absolute; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.5); color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .2s; }
+    .card-group:hover .cnav { opacity: 1; }
+    .cnav.up { top: 6px; } .cnav.dn { bottom: 6px; }
+    .cinfo { padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
+    .cinfo .lbl { font-size: 13px; font-weight: 600; }
+    .cinfo .rbadge { padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: 600; background: #2d4a1e; color: #81c784; }
+    .cinfo .rnote { color: #777; font-size: 11px; }
+    .vdots { margin-left: auto; display: flex; gap: 4px; }
+    .vdot { width: 6px; height: 6px; border-radius: 50%; background: #444; }
+    .vdot.on { background: #4CAF50; }
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 1000; align-items: center; justify-content: center; flex-direction: column; }
+    .modal.active { display: flex; }
+    .mwrap { position: relative; }
+    .mwrap img { max-width: 85vw; max-height: 65vh; background: white; padding: 24px; border-radius: 12px; }
+    .mpill { position: absolute; top: 12px; left: 12px; padding: 4px 14px; border-radius: 12px; font-size: 12px; font-weight: 700; }
+    .minfo { margin-top: 16px; text-align: center; }
+    .minfo .nm { font-size: 16px; font-weight: 600; }
+    .minfo .rl { color: #81c784; font-size: 12px; margin-top: 4px; }
+    .minfo .ht { color: #555; font-size: 11px; margin-top: 8px; }
+    .mcl { position: absolute; top: 16px; right: 24px; color: white; font-size: 36px; cursor: pointer; }
+    .mlr { position: absolute; top: 50%; transform: translateY(-50%); color: white; font-size: 56px; cursor: pointer; user-select: none; padding: 16px; opacity: .6; }
+    .mlr:hover { opacity: 1; color: #4CAF50; }
+    .mlr.p { left: 12px; } .mlr.n { right: 12px; }
+    .mud { color: white; font-size: 28px; cursor: pointer; user-select: none; opacity: .6; padding: 4px 12px; }
+    .mud:hover { opacity: 1; color: #4CAF50; }
+    .mudbar { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+    .muddots { display: flex; gap: 5px; }
+    .muddot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
+    .muddot.on { background: #4CAF50; }
+    .favbar { position: fixed; bottom: 0; left: 0; right: 0; background: #1a1a1a; padding: 12px 20px; display: flex; align-items: center; gap: 15px; border-top: 1px solid #333; }
+    .favbar span { color: #666; font-size: 13px; }
+    .favbar .fl { flex: 1; color: #4CAF50; font-weight: 600; font-size: 13px; }
+  </style>
+</head>
+<body>
+<h1>만화제면소 Symbol Logo</h1>
+<p class="sub">&larr; &rarr; browse &bull; &uarr; &darr; versions &bull; Dbl-click/F fav &bull; Esc close</p>
+<div class="status" id="st">Scanning...</div>
+<div class="grid" id="grid"></div>
+<div class="favbar"><span>Favorites:</span><div class="fl" id="fl">None</div></div>
+<div class="modal" id="modal" onclick="if(event.target===this)cm()">
+  <span class="mcl" onclick="cm()">&times;</span>
+  <span class="mlr p" onclick="lr(-1)">&#8249;</span>
+  <span class="mlr n" onclick="lr(1)">&#8250;</span>
+  <div class="mwrap"><img id="mi" src=""><div class="mpill" id="mp"></div></div>
+  <div class="minfo">
+    <div class="nm" id="mn"></div>
+    <div class="rl" id="mr"></div>
+    <div class="mudbar" id="mub">
+      <span class="mud" onclick="ud(-1)">&#9650;</span>
+      <div class="muddots" id="mud2"></div>
+      <span class="mud" onclick="ud(1)">&#9660;</span>
+    </div>
+    <div class="ht">&larr; &rarr; logos &bull; &uarr; &darr; versions &bull; F fav &bull; Esc close</div>
+  </div>
+</div>
+<script>
+const MX=50,MV=20;
+const REV={};
+let G=[],mi=-1,fav=new Set();
+const p=n=>String(n).padStart(2,'0');
+const tl=fn=>new Promise(r=>{const i=new Image();i.onload=()=>r({fn,ok:1});i.onerror=()=>r({fn,ok:0});i.src=fn;});
+async function scan(){
+  const st=document.getElementById('st'),ng=[];
+  const op=[];for(let i=1;i<=MX;i++)op.push(tl('logo-'+p(i)+'.png'));
+  const or=await Promise.all(op);
+  for(let i=1;i<=MX;i++){
+    if(!or[i-1].ok)continue;
+    const g={num:i,v:[{file:'logo-'+p(i)+'.png',label:'#'+p(i),type:'orig',note:''}],ai:0};
+    const rv=REV[i];
+    if(rv){const rp=[];for(let j=1;j<=MV;j++)rp.push(tl(rv.prefix+p(j)+'.png'));
+      const rr=await Promise.all(rp);
+      for(let j=1;j<=MV;j++)if(rr[j-1].ok)g.v.push({file:rv.prefix+p(j)+'.png',label:'#'+p(i)+'-v'+j,type:'rev',note:rv.note});}
+    ng.push(g);}
+  G=ng;
+  if(!G.length){st.textContent='No logos yet...';setTimeout(scan,3000);return;}
+  const tr=G.reduce((s,g)=>s+g.v.length-1,0);
+  st.textContent=G.length+' logos'+(tr?' \u00b7 '+tr+' revisions':'');
+  st.classList.add('done');rg();setTimeout(poll,5000);}
+async function poll(){
+  const kn=new Set();G.forEach(g=>g.v.forEach(v=>kn.add(v.file)));let f=0;
+  for(let i=1;i<=MX;i++){
+    if(!kn.has('logo-'+p(i)+'.png')&&(await tl('logo-'+p(i)+'.png')).ok)f++;
+    const rv=REV[i];if(!rv)continue;
+    for(let j=1;j<=MV;j++){const fn=rv.prefix+p(j)+'.png';if(!kn.has(fn)&&(await tl(fn)).ok)f++;}}
+  if(f>0)await scan();else setTimeout(poll,5000);}
+function rg(){
+  const grid=document.getElementById('grid');grid.innerHTML='';
+  G.forEach((g,gi)=>{
+    const el=document.createElement('div');
+    el.className='card-group'+(g.v.length>1?' has-rev':'');
+    const v=g.v[g.ai],pc=v.type==='rev'?'rev':'orig';
+    const pt=v.type==='rev'?'REV v'+g.ai:'ORIGINAL';
+    let dots='';
+    if(g.v.length>1)dots=g.v.map((_,vi)=>'<div class="vdot'+(vi===g.ai?' on':'')+'"></div>').join('');
+    el.innerHTML='<div class="card-viewer" onclick="om('+gi+')"><img src="'+v.file+'"><div class="vpill '+pc+'">'+pt+'</div>'+(g.v.length>1?'<button class="cnav up" onclick="event.stopPropagation();cn('+gi+',-1)">&#9650;</button><button class="cnav dn" onclick="event.stopPropagation();cn('+gi+',1)">&#9660;</button>':'')+'</div><div class="cinfo"><span class="lbl">'+v.label+'</span>'+(v.type==='rev'?'<span class="rbadge">REV</span>':'')+(v.note?'<span class="rnote">'+v.note+'</span>':'')+(g.v.length>1?'<div class="vdots">'+dots+'</div>':'')+'</div>';
+    el.ondblclick=function(){tf(v.label);};
+    grid.appendChild(el);});}
+function cn(gi,d){var g=G[gi];g.ai=(g.ai+d+g.v.length)%g.v.length;rg();}
+function om(gi){mi=gi;rm();document.getElementById('modal').classList.add('active');}
+function cm(){document.getElementById('modal').classList.remove('active');mi=-1;}
+function lr(d){if(mi<0)return;mi=(mi+d+G.length)%G.length;rm();}
+function ud(d){if(mi<0)return;var g=G[mi];if(g.v.length<=1)return;g.ai=(g.ai+d+g.v.length)%g.v.length;rm();rg();}
+function rm(){
+  var g=G[mi],v=g.v[g.ai];
+  document.getElementById('mi').src=v.file;
+  document.getElementById('mn').textContent=v.label;
+  var pl=document.getElementById('mp');
+  if(v.type==='rev'){pl.textContent='REV v'+g.ai;pl.style.background='rgba(46,125,50,.85)';pl.style.color='#fff';document.getElementById('mr').textContent=v.note;}
+  else{pl.textContent='ORIGINAL';pl.style.background='rgba(0,0,0,.6)';pl.style.color='#ccc';document.getElementById('mr').textContent='';}
+  var ub=document.getElementById('mub'),ud2=document.getElementById('mud2');
+  if(g.v.length>1){ub.style.display='flex';ud2.innerHTML=g.v.map(function(_,vi){return '<div class="muddot'+(vi===g.ai?' on':'')+'"></div>';}).join('');}
+  else{ub.style.display='none';}}
+function tf(l){fav.has(l)?fav.delete(l):fav.add(l);document.getElementById('fl').textContent=fav.size?Array.from(fav).sort().join(', '):'None';}
+document.addEventListener('keydown',function(e){
+  if(mi<0)return;
+  if(e.key==='Escape')cm();
+  if(e.key==='ArrowLeft')lr(-1);if(e.key==='ArrowRight')lr(1);
+  if(e.key==='ArrowUp'){e.preventDefault();ud(-1);}
+  if(e.key==='ArrowDown'){e.preventDefault();ud(1);}
+  if(e.key==='f'||e.key==='F'){tf(G[mi].v[G[mi].ai].label);}});
+scan();
+</script>
+</body>
+</html>

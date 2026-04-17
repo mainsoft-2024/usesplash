@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "SVG Logo Designer": {
+      "source": "rknall/claude-skills",
+      "sourceType": "github",
+      "computedHash": "c591208a052cc9f7deb77be1183e4627daf54dbf575ea2653f519f29fe3bd4c8"
+    },
+    "logo-creator": {
+      "source": "resciencelab/opc-skills",
+      "sourceType": "github",
+      "computedHash": "baac641dd2fb8b6e1aa658e8372c5e83672479e35553247d5ece4dd7917fa48c"
+    },
+    "logo-design-guide": {
+      "source": "inference-sh/skills",
+      "sourceType": "github",
+      "computedHash": "88b6dab119da5e33c7a669f53cb3416ce1655f29c080c646c7e21cecd9198a81"
+    },
+    "nanobanana": {
+      "source": "resciencelab/opc-skills",
+      "sourceType": "github",
+      "computedHash": "b3ef6022c2d2b1be94fa2d52ae0da749495eef1fe4ea2becd413f052c03a13e6"
+    }
+  }
+}
