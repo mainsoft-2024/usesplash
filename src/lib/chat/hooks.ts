@@ -9,7 +9,20 @@ export function useProjectChat(projectId: string, initialMessages?: UIMessage[])
   const prevLengthRef = useRef(0)
 
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/chat", body: { projectId } }),
+    () => new DefaultChatTransport({
+      api: "/api/chat",
+      body: { projectId },
+      fetch: async (url, init) => {
+        const res = await fetch(url, init)
+        if (res.status === 403) {
+          const data = await res.json().catch(() => null)
+          const err = new Error(data?.message ?? "일일 생성 한도를 초과했습니다.")
+          ;(err as any).code = data?.error ?? "DAILY_LIMIT_REACHED"
+          throw err
+        }
+        return res
+      },
+    }),
     [projectId]
   )
 
@@ -72,7 +85,7 @@ export function useProjectChat(projectId: string, initialMessages?: UIMessage[])
     handleSubmit,
     sendMessage,
     isLoading: chat.status === "submitted" || chat.status === "streaming",
-    error: chat.error,
+    error: chat.error as (Error & { code?: string }) | undefined,
     reload: chat.regenerate,
     stop: chat.stop,
   }

@@ -2,25 +2,43 @@
 
 import Link from "next/link"
 import { use, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { KpiCard } from "@/components/admin/kpi-card"
 import { trpc } from "@/lib/trpc/client"
-
 type PageProps = {
   params: Promise<{ id: string }>
 }
 
-type SubscriptionTier = "free" | "pro" | "enterprise"
+type SubscriptionTier = "free" | "pro" | "demo" | "enterprise"
 
 function formatDate(value: string | Date) {
   return new Date(value).toLocaleDateString("ko-KR")
+}
+
+function formatUsd(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
 }
 
 export default function AdminUserDetailPage(props: PageProps) {
   const params = use(props.params)
   const [expandedProjectIds, setExpandedProjectIds] = useState<Set<string>>(new Set())
 
+  const searchParams = useSearchParams()
+  const period = searchParams.get("period")
+  const backHref = period ? `/admin?period=${encodeURIComponent(period)}` : "/admin"
   const { data, isLoading, error } = trpc.admin.getUserDetail.useQuery({
     userId: params.id,
   })
+
+  const { data: userCostRevenue, isLoading: isUserCostRevenueLoading } =
+    trpc.adminInsights.getUserCostRevenue.useQuery({
+      userId: params.id,
+    })
 
   const utils = trpc.useUtils()
   const currentTier = (data?.subscription?.tier ?? "free") as SubscriptionTier
@@ -46,7 +64,8 @@ export default function AdminUserDetailPage(props: PageProps) {
     const tierOrder: Record<SubscriptionTier, number> = {
       free: 0,
       pro: 1,
-      enterprise: 2,
+      demo: 2,
+      enterprise: 3,
     }
 
     const isDowngrade = tierOrder[nextTier] < tierOrder[currentTier]
@@ -102,7 +121,7 @@ export default function AdminUserDetailPage(props: PageProps) {
     return (
       <div className="min-h-screen bg-[#0e0e0e] p-8 text-white">
         <div className="mx-auto max-w-6xl space-y-4">
-          <Link href="/admin" className="text-sm text-[#a1a1a1] transition-colors hover:text-white">
+          <Link href={backHref} className="text-sm text-[#a1a1a1] transition-colors hover:text-white">
             ← 어드민으로 돌아가기
           </Link>
           <p className="text-red-400">사용자 정보를 불러오지 못했습니다.</p>
@@ -116,9 +135,39 @@ export default function AdminUserDetailPage(props: PageProps) {
   return (
     <div className="min-h-screen bg-[#0e0e0e] p-8 text-white">
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
-        <Link href="/admin" className="text-sm text-[#a1a1a1] transition-colors hover:text-white">
+        <Link href={backHref} className="text-sm text-[#a1a1a1] transition-colors hover:text-white">
           ← 어드민으로 돌아가기
         </Link>
+
+        <section className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-xs uppercase tracking-wider text-[#a1a1a1]">수익 & 비용</h2>
+            {period ? <span className="text-xs text-[#6b6b6b]">기간: {period}</span> : null}
+          </div>
+          {isUserCostRevenueLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+                  <div className="h-3 w-24 animate-pulse rounded bg-[#2a2a2a]" />
+                  <div className="mt-3 h-8 w-28 animate-pulse rounded bg-[#2a2a2a]" />
+                </div>
+              ))}
+            </div>
+          ) : userCostRevenue ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <KpiCard label="월 구독가" value={formatUsd(userCostRevenue.monthlyPriceUsd)} />
+              <KpiCard label="LTV" value={formatUsd(userCostRevenue.ltvUsd)} />
+              <KpiCard label="총 비용" value={formatUsd(userCostRevenue.totalCostUsd)} />
+              <KpiCard
+                label="마진"
+                value={formatUsd(userCostRevenue.marginUsd)}
+                trend={{ direction: userCostRevenue.marginUsd >= 0 ? "up" : "down", percentage: 0 }}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-[#a1a1a1]">수익/비용 데이터가 없습니다.</p>
+          )}
+        </section>
 
         <section className="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-6">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -155,6 +204,9 @@ export default function AdminUserDetailPage(props: PageProps) {
                     <option value="pro" className="bg-[#1a1a1a] text-white">
                       프로
                     </option>
+                    <option value="demo" className="bg-[#1a1a1a] text-white">
+                      데모
+                    </option>
                     <option value="enterprise" className="bg-[#1a1a1a] text-white">
                       엔터프라이즈
                     </option>
@@ -176,7 +228,9 @@ export default function AdminUserDetailPage(props: PageProps) {
                     ? "bg-[#2a2a2a] text-[#a1a1a1]"
                     : selectedTier === "pro"
                       ? "bg-[var(--accent-green)]/10 text-[var(--accent-green)]"
-                      : "bg-purple-500/10 text-purple-400"
+                      : selectedTier === "demo"
+                        ? "bg-blue-500/10 text-blue-400"
+                        : "bg-purple-500/10 text-purple-400"
                 }`}
               >
                 {selectedTier.toUpperCase()}

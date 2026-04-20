@@ -76,6 +76,26 @@ body { overflow-x: hidden; }
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideUpIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wipeInLR {
+  from { -webkit-mask-position: -100% 0; mask-position: -100% 0; }
+  to   { -webkit-mask-position: 0% 0;    mask-position: 0% 0; }
+}
+
+.wipe-in-lr {
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 62%, transparent 82%, transparent 100%);
+          mask-image: linear-gradient(to right, #000 0%, #000 62%, transparent 82%, transparent 100%);
+  -webkit-mask-size: 200% 100%;
+          mask-size: 200% 100%;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  animation: wipeInLR 900ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
 /* Chat markdown: inline vs fenced code (react-markdown nests block code in <pre><code>) */
 .chat-md pre.chat-md-pre code.chat-md-code {
   display: block;

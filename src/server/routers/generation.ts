@@ -28,7 +28,7 @@ export const generationRouter = router({
         where: { userId },
       })
       const tier = sub?.tier ?? "free"
-      const LIMITS: Record<string, number> = { free: 10, pro: 100, enterprise: -1 }
+      const LIMITS: Record<string, number> = { free: 10, pro: 100, demo: -1, enterprise: -1 }
       const limit = LIMITS[tier] ?? 10
       if (limit !== -1 && (sub?.dailyGenerations ?? 0) + input.count > limit) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Daily generation limit reached" })
@@ -60,7 +60,11 @@ export const generationRouter = router({
           })
 
           const s3Key = getStorageKey(userId, input.projectId, logo.id, "v1")
-          const imageUrl = await uploadImage(s3Key, result.imageBuffer, result.mimeType)
+          const { url: imageUrl, bytes: _bytes } = await uploadImage(
+            s3Key,
+            result.imageBuffer,
+            result.mimeType
+          )
 
           const version = await ctx.prisma.logoVersion.create({
             data: {
@@ -149,7 +153,11 @@ export const generationRouter = router({
         sourceVersion.logoId,
         `v${nextVersion}`
       )
-      const imageUrl = await uploadImage(s3Key, result.imageBuffer, result.mimeType)
+      const { url: imageUrl, bytes: _bytes } = await uploadImage(
+        s3Key,
+        result.imageBuffer,
+        result.mimeType
+      )
 
       const newVersion = await ctx.prisma.logoVersion.create({
         data: {

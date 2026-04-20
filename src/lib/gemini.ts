@@ -14,19 +14,58 @@ function getClient() {
   return new GoogleGenAI({ apiKey })
 }
 
+type GeminiLogStatus = "ok" | "retry" | "failed"
+type GeminiErrorMeta = { status: number | null; message: string; isRetryable: boolean }
+
+function parseGeminiError(error: unknown): GeminiErrorMeta {
+  const status = typeof error === "object" && error !== null && "status" in error ? (error as { status?: number }).status ?? null : null
+  const message = error instanceof Error ? error.message : String(error)
+  const isRetryable =
+    status === 429 ||
+    status === 503 ||
+    message.includes("RESOURCE_EXHAUSTED") ||
+    message.includes("UNAVAILABLE")
+
+  return { status, message, isRetryable }
+}
+
+async function writeGeminiRequestLog(input: {
+  status: GeminiLogStatus
+  attempt: number
+  latencyMs: number
+  httpCode: number | null
+  errorMessage?: string
+}) {
+  try {
+    const { prisma } = await import("./prisma")
+    await prisma.geminiRequestLog.create({
+      data: {
+        userId: null,
+        projectId: null,
+        model: MODEL_NAME,
+        status: input.status,
+        httpCode: input.httpCode,
+        attempt: input.attempt,
+        latencyMs: input.latencyMs,
+        errorMessage: input.errorMessage,
+      },
+    })
+  } catch (error) {
+    console.error("Gemini request log write failed", {
+      model: MODEL_NAME,
+      status: input.status,
+      attempt: input.attempt,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
 async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await fn()
     } catch (error) {
-      const status = typeof error === "object" && error !== null && "status" in error ? (error as { status?: number }).status : undefined
-      const message = error instanceof Error ? error.message : String(error)
-      const isRetryable =
-        status === 429 ||
-        status === 503 ||
-        message.includes("RESOURCE_EXHAUSTED") ||
-        message.includes("UNAVAILABLE")
-
+      const { isRetryable } = parseGeminiError(error)
       if (!isRetryable || attempt === maxRetries) throw error
 
       const delay = Math.pow(2, attempt + 1) * 1000
@@ -53,28 +92,52 @@ export async function withGeminiConcurrency<T>(fn: () => Promise<T>): Promise<T>
 
 export async function generateLogoImage(
   prompt: string,
-  options: { aspectRatio?: string } = {}
+  options: {
+    aspectRatio?: string
+    referenceImages?: Array<{ data: string; mimeType: string }>
+  } = {}
 ): Promise<{ imageBuffer: Buffer; mimeType: string } | null> {
   const ai = getClient()
   const aspectRatio = VALID_ASPECT_RATIOS.includes(options.aspectRatio as AspectRatio)
     ? options.aspectRatio
     : "1:1"
+  const contents = options.referenceImages?.length
+    ? [...options.referenceImages.map((referenceImage) => ({ inlineData: { mimeType: referenceImage.mimeType, data: referenceImage.data } })), prompt]
+    : prompt
   let attempt = 0
 
   let response: Awaited<ReturnType<typeof ai.models.generateContent>>
+  const maxRetries = 3
   try {
     response = await withRetry(async () => {
       attempt++
       const start = Date.now()
       try {
-        return await ai.models.generateContent({
+        const result = await ai.models.generateContent({
           model: MODEL_NAME,
-          contents: prompt,
+          contents,
           config: {
             responseModalities: ["IMAGE", "TEXT"],
             imageConfig: { aspectRatio: aspectRatio as AspectRatio },
           },
         })
+        await writeGeminiRequestLog({
+          status: "ok",
+          httpCode: null,
+          attempt,
+          latencyMs: Date.now() - start,
+        })
+        return result
+      } catch (error) {
+        const { status, message, isRetryable } = parseGeminiError(error)
+        await writeGeminiRequestLog({
+          status: isRetryable && attempt <= maxRetries ? "retry" : "failed",
+          httpCode: status,
+          attempt,
+          latencyMs: Date.now() - start,
+          errorMessage: message,
+        })
+        throw error
       } finally {
         console.log(
           JSON.stringify({
@@ -85,7 +148,7 @@ export async function generateLogoImage(
           }),
         )
       }
-    })
+    }, maxRetries)
   } catch (error) {
     console.error("Gemini generateLogoImage unrecoverable error", {
       model: MODEL_NAME,
@@ -130,12 +193,13 @@ export async function editLogoImage(
   let attempt = 0
 
   let response: Awaited<ReturnType<typeof ai.models.generateContent>>
+  const maxRetries = 3
   try {
     response = await withRetry(async () => {
       attempt++
       const start = Date.now()
       try {
-        return await ai.models.generateContent({
+        const result = await ai.models.generateContent({
           model: MODEL_NAME,
           contents: [
             { inlineData: { mimeType: sourceMimeType, data: base64 } },
@@ -145,6 +209,23 @@ export async function editLogoImage(
             responseModalities: ["IMAGE", "TEXT"],
           },
         })
+        await writeGeminiRequestLog({
+          status: "ok",
+          httpCode: null,
+          attempt,
+          latencyMs: Date.now() - start,
+        })
+        return result
+      } catch (error) {
+        const { status, message, isRetryable } = parseGeminiError(error)
+        await writeGeminiRequestLog({
+          status: isRetryable && attempt <= maxRetries ? "retry" : "failed",
+          httpCode: status,
+          attempt,
+          latencyMs: Date.now() - start,
+          errorMessage: message,
+        })
+        throw error
       } finally {
         console.log(
           JSON.stringify({
@@ -155,7 +236,7 @@ export async function editLogoImage(
           }),
         )
       }
-    })
+    }, maxRetries)
   } catch (error) {
     console.error("Gemini editLogoImage unrecoverable error", {
       model: MODEL_NAME,

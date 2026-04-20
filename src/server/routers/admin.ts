@@ -1,19 +1,8 @@
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
-import { protectedProcedure, router } from "@/lib/trpc/server"
-
-const adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  const dbUser = await ctx.prisma.user.findUnique({
-    where: { id: ctx.session.user.id },
-    select: { role: true },
-  })
-
-  if (!dbUser || dbUser.role !== "admin") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "관리자 권한이 필요합니다." })
-  }
-
-  return next()
-})
+import { router } from "@/lib/trpc/server"
+import { adminProcedure } from "./_admin-procedure"
+import { PLAN_PRICE_USD } from "@/lib/pricing"
 
 export const adminRouter = router({
   listUsers: adminProcedure
@@ -22,6 +11,10 @@ export const adminRouter = router({
         page: z.number().default(1),
         pageSize: z.number().default(20),
         search: z.string().optional(),
+        tiers: z.array(z.string()).optional(),
+        activity: z.enum(["active", "inactive"]).optional(),
+        signupFrom: z.date().optional(),
+        signupTo: z.date().optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -29,14 +22,56 @@ export const adminRouter = router({
       const pageSize = Math.max(input.pageSize, 1)
       const skip = (page - 1) * pageSize
 
-      const where = input.search
-        ? {
-            OR: [
-              { name: { contains: input.search, mode: "insensitive" as const } },
-              { email: { contains: input.search, mode: "insensitive" as const } },
-            ],
-          }
-        : undefined
+      const now = new Date()
+      const thirtyDaysAgo = new Date(now)
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      const andConditions = [
+        input.search
+          ? {
+              OR: [
+                { name: { contains: input.search, mode: "insensitive" as const } },
+                { email: { contains: input.search, mode: "insensitive" as const } },
+              ],
+            }
+          : undefined,
+        input.tiers?.length
+          ? (() => {
+              const includesFree = input.tiers.includes("free")
+              const paidTiers = input.tiers.filter((tier) => tier !== "free")
+
+              if (includesFree && paidTiers.length > 0) {
+                return {
+                  OR: [
+                    { subscription: { is: null } },
+                    { subscription: { is: { tier: { in: paidTiers } } } },
+                  ],
+                }
+              }
+
+              if (includesFree) {
+                return { subscription: { is: null } }
+              }
+
+              return { subscription: { is: { tier: { in: paidTiers } } } }
+            })()
+          : undefined,
+        input.activity === "active"
+          ? { usageLogs: { some: { createdAt: { gte: thirtyDaysAgo } } } }
+          : input.activity === "inactive"
+            ? { usageLogs: { none: { createdAt: { gte: thirtyDaysAgo } } } }
+            : undefined,
+        input.signupFrom || input.signupTo
+          ? {
+              createdAt: {
+                ...(input.signupFrom ? { gte: input.signupFrom } : {}),
+                ...(input.signupTo ? { lte: input.signupTo } : {}),
+              },
+            }
+          : undefined,
+      ].filter((condition): condition is NonNullable<typeof condition> => condition !== undefined)
+
+      const where = andConditions.length > 0 ? { AND: andConditions } : undefined
 
       const [users, total] = await Promise.all([
         ctx.prisma.user.findMany({
@@ -59,27 +94,57 @@ export const adminRouter = router({
 
       const userIds = users.map((user) => user.id)
 
-      const generationGroups = userIds.length
+      const usageGroups = userIds.length
         ? await ctx.prisma.usageLog.groupBy({
             by: ["userId"],
             where: { userId: { in: userIds } },
-            _sum: { count: true },
+            _sum: {
+              count: true,
+              imageCostUsd: true,
+              llmCostUsd: true,
+              blobCostUsd: true,
+            },
           })
         : []
 
-      const generationMap = new Map(generationGroups.map((item) => [item.userId, item._sum.count ?? 0]))
+      const usageMap = new Map(usageGroups.map((item) => [item.userId, item._sum]))
 
+      const toNumber = (value: { toNumber: () => number } | number | null | undefined) => {
+        if (value == null) return 0
+        return typeof value === "number" ? value : value.toNumber()
+      }
+
+      const monthsSinceSignup = (joinedAt: Date) => {
+        let months = (now.getFullYear() - joinedAt.getFullYear()) * 12
+        months += now.getMonth() - joinedAt.getMonth()
+        if (now.getDate() < joinedAt.getDate()) {
+          months -= 1
+        }
+        return Math.max(months, 0)
+      }
       return {
-        users: users.map((user) => ({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          joinedAt: user.createdAt,
-          projectCount: user._count.projects,
-          tier: user.subscription?.tier ?? "free",
-          totalGenerations: generationMap.get(user.id) ?? 0,
-        })),
+        users: users.map((user) => {
+          const tier = (user.subscription?.tier ?? "free") as keyof typeof PLAN_PRICE_USD
+          const ltvUsd = monthsSinceSignup(user.createdAt) * PLAN_PRICE_USD[tier]
+          const totalCostUsd =
+            toNumber(usageMap.get(user.id)?.imageCostUsd) +
+            toNumber(usageMap.get(user.id)?.llmCostUsd) +
+            toNumber(usageMap.get(user.id)?.blobCostUsd)
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            joinedAt: user.createdAt,
+            projectCount: user._count.projects,
+            tier: user.subscription?.tier ?? "free",
+            totalGenerations: usageMap.get(user.id)?.count ?? 0,
+            totalCostUsd,
+            ltvUsd,
+            marginUsd: ltvUsd - totalCostUsd,
+          }
+        }),
         total,
         page,
         pageSize,
@@ -197,7 +262,7 @@ export const adminRouter = router({
         distinct: ["userId"],
       }),
       ctx.prisma.subscription.count({
-        where: { tier: { in: ["pro", "enterprise"] } },
+        where: { tier: { in: ["pro", "demo", "enterprise"] } },
       }),
       ctx.prisma.usageLog.findMany({
         where: { createdAt: { gte: prev7Start } },
@@ -280,10 +345,16 @@ export const adminRouter = router({
       const rangeStart = new Date(todayMidnightUTC)
       rangeStart.setUTCDate(rangeStart.getUTCDate() - (input.days - 1))
 
-      const logs = await ctx.prisma.usageLog.findMany({
-        where: { createdAt: { gte: rangeStart } },
-        select: { createdAt: true, count: true },
-      })
+      const [logs, baselineAgg] = await Promise.all([
+        ctx.prisma.usageLog.findMany({
+          where: { createdAt: { gte: rangeStart } },
+          select: { createdAt: true, count: true },
+        }),
+        ctx.prisma.usageLog.aggregate({
+          where: { createdAt: { lt: rangeStart } },
+          _sum: { count: true },
+        }),
+      ])
 
       const toUTCDateKey = (date: Date) => date.toISOString().slice(0, 10)
       const countsByDate = new Map<string, number>()
@@ -293,14 +364,17 @@ export const adminRouter = router({
         countsByDate.set(key, (countsByDate.get(key) ?? 0) + log.count)
       }
 
+      const baseline = baselineAgg._sum.count ?? 0
       const chart: Array<{ date: string; count: number }> = []
+      let running = baseline
       for (let i = 0; i < input.days; i++) {
         const day = new Date(rangeStart)
         day.setUTCDate(rangeStart.getUTCDate() + i)
         const key = toUTCDateKey(day)
+        running += countsByDate.get(key) ?? 0
         chart.push({
           date: key,
-          count: countsByDate.get(key) ?? 0,
+          count: running,
         })
       }
 

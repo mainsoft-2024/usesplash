@@ -127,12 +127,36 @@ model UsageLog {
   id        String   @id @default(cuid())
   userId    String
   projectId String?
-  type      String   // "generate" | "edit"
+  type      String   // "generate" | "edit" | "llm"
   count     Int      @default(1)
+  model     String?
+  imageCount Int?
+  imageCostUsd Decimal? @db.Decimal(14,6)
+  llmInputTokens Int?
+  llmOutputTokens Int?
+  llmCostUsd Decimal? @db.Decimal(14,6)
+  blobBytes BigInt?
+  blobCostUsd Decimal? @db.Decimal(14,6)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([userId, type])
+}
+
+model GeminiRequestLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  projectId    String?
+  model        String
+  status       String
+  httpCode     Int?
+  attempt      Int
+  latencyMs    Int
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
 }

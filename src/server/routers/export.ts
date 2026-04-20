@@ -20,10 +20,11 @@ export const exportRouter = router({
       const imageBuffer = Buffer.from(await response.arrayBuffer())
 
       const trimmed = await sharp(imageBuffer)
-        .trim({ threshold: 240 })
+        .trim({ background: "#ffffff", threshold: 20 })
         .toBuffer({ resolveWithObject: true })
 
-      const size = Math.max(trimmed.info.width, trimmed.info.height) + 10
+      const padding = Math.round(Math.max(trimmed.info.width, trimmed.info.height) * 0.06)
+      const size = Math.max(trimmed.info.width, trimmed.info.height) + padding * 2
       const cropped = await sharp({
         create: {
           width: size,
@@ -48,7 +49,7 @@ export const exportRouter = router({
         `${version.id}-cropped`,
         "png",
       )
-      const url = await uploadImage(key, cropped)
+      const { url, bytes: _bytes } = await uploadImage(key, cropped)
       return { url, key }
     }),
 
@@ -91,7 +92,7 @@ export const exportRouter = router({
         `${version.id}-nobg`,
         "png",
       )
-      const url = await uploadImage(key, resultBuffer)
+      const { url, bytes: _bytes } = await uploadImage(key, resultBuffer)
       return { url, key }
     }),
 
@@ -140,7 +141,7 @@ export const exportRouter = router({
         `${version.id}-vector`,
         "svg",
       )
-      const url = await uploadImage(key, svgBuffer, "image/svg+xml")
+      const { url, bytes: _bytes } = await uploadImage(key, svgBuffer, "image/svg+xml")
       return { url, key }
     }),
 

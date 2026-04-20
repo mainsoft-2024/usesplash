@@ -4,7 +4,7 @@ import Google from "next-auth/providers/google"
 import GitHub from "next-auth/providers/github"
 import { prisma } from "./prisma"
 
-const ADMIN_EMAIL = "2000mageia@gmail.com"
+const ADMIN_EMAILS = ["2000mageia@gmail.com", "mainsoft.demo2024@gmail.com", "mainsoft2024@gmail.com"]
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
@@ -40,7 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return token
       }
 
-      if (dbUser.email === ADMIN_EMAIL && dbUser.role !== "admin") {
+      if (dbUser.email && ADMIN_EMAILS.includes(dbUser.email) && dbUser.role !== "admin") {
         await prisma.user.update({
           where: { id: dbUser.id },
           data: { role: "admin" },

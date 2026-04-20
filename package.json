@@ -4,11 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma migrate deploy && prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
-    "backfill-usage": "npx tsx scripts/backfill-usage.ts"
+    "backfill-usage": "npx tsx scripts/backfill-usage.ts",
+    "backfill-usage-costs": "pnpm tsx scripts/backfill-usage-costs.ts",
+    "seed-test-admin": "pnpm tsx scripts/seed-test-admin.ts",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.160",
@@ -24,6 +28,7 @@
     "@trpc/client": "^11.13.0",
     "@trpc/react-query": "^11.13.0",
     "@trpc/server": "^11.13.0",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.3",
     "ai": "^6.0.158",
     "dotenv": "^17.4.1",
@@ -42,14 +47,18 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@playwright/test": "^1.54.2",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
+    "jsdom": "^29.0.2",
     "prisma": "^7.7.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

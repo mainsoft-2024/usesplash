@@ -1,0 +1,155 @@
+{
+  "sequences": [
+    {
+      "id": "splash",
+      "name": "Splash 로고",
+      "tagline": "우리 브랜드 로고가 완성된 과정",
+      "initialPrompt": "'splash' wordmark logo with rainbow paint splash effect, modern typography, vibrant multi-color paint explosion, clean white background, professional liquid motion design, high resolution, sharp details",
+      "versions": [
+        {
+          "n": 1,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v1.png",
+          "caption": "무지개 물감이 튄 느낌으로 splash 로고 하나 만들어줘",
+          "editPrompt": null,
+          "parent": null,
+          "createdAt": "2026-04-14T02:23:15.025Z",
+          "originalN": 1
+        },
+        {
+          "n": 2,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v2.png",
+          "caption": "맨 앞 s랑 맨 끝 h 색도 무지개에 자연스럽게 녹여봐",
+          "editPrompt": "Change the color of the first and last letters 's' and 'h' from black to match the nearby colors of the rainbow splash (such as blue, purple, or pink) so they blend naturally with the colorful paint effect. Keep the overall design of logo #2.",
+          "parent": "cmnxzyqmp000404jyaoktxi9y",
+          "createdAt": "2026-04-14T02:29:48.806Z",
+          "originalN": 2
+        },
+        {
+          "n": 3,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v3.png",
+          "caption": "글자를 반투명 뿌연 유리처럼 바꿔봐, 뒤로 물감이 비치게",
+          "editPrompt": "Transform logo #2 into a high-end 3d realistic style. The 'splash' text should be made of clear frosted glass with realistic refraction and light bending effects. Behind the glass text, the rainbow paint splash is enlarged to fill the entire background area behind the word. The paint should look like high-speed photography of real paint, with glossy textures and depth, visible through the refracting glass letters. professional 3D render, studio lighting, photorealistic.",
+          "parent": "cmny076h2000i04jyzl093y6f",
+          "createdAt": "2026-04-14T02:33:05.876Z",
+          "originalN": 3
+        },
+        {
+          "n": 4,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v4.png",
+          "caption": "더 맑고 투명하게, 빛도 확실하게 꺾이게 해줘",
+          "editPrompt": "Modify logo #2 version 3: Change the 'splash' text to be completely clear, high-clarity transparent glass without any frostiness. Increase the index of refraction significantly to create heavy dramatic distortion and bending of the rainbow paint background behind the letters. Should look like thick, pure optical glass with sharp realistic light reflections and strong liquid-like refraction. Photorrealistic 3D render, luxury finish.",
+          "parent": "cmny0bej8000m04jyiup0y5ug",
+          "createdAt": "2026-04-14T02:34:36.491Z",
+          "originalN": 4
+        },
+        {
+          "n": 5,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v6.png",
+          "caption": "물감은 좀 줄이고 여백을 넉넉하게, 화면에 다 들어오게",
+          "editPrompt": "Scale down the rainbow paint splash in the background of logo #2 version 5. Add more white space around the edges so the entire paint explosion is clearly centered and not touching or going outside the frame. The transparent glass 'splash' text should remain, showing the centered rainbow paint through its refraction. Clean white studio background.",
+          "parent": "cmny0glrs000u04jypax8oejm",
+          "createdAt": "2026-04-14T02:38:19.048Z",
+          "originalN": 6
+        },
+        {
+          "n": 6,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v9.png",
+          "caption": "글자는 처음처럼 크고 또렷하게 키워봐",
+          "editPrompt": "In logo #2 version 6 (the high-clarity transparent glass version), increase the size of the 'splash' text wordmark to be large and prominent like it was in the initial version. The rainbow paint splash background should remain centered and not cut off by the frame. High-clarity optical glass with strong refraction.",
+          "parent": "cmny0i46g000y04jyfgwufi1e",
+          "createdAt": "2026-04-14T02:43:02.303Z",
+          "originalN": 9
+        },
+        {
+          "n": 7,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v14.png",
+          "caption": "뒷배경은 아예 새하얗게, 티끌 하나 없이",
+          "editPrompt": "Modify both logo version 12 (transparent glass) and version 13 (frosted glass) to have a perfectly flat, pure solid white background (#FFFFFF). Remove any subtle paper texture or shadows from the background to make it look clean and minimal, while keeping the vibrant rainbow paint splash and glass text in the center. Professional studio finish.",
+          "parent": "cmny0s4jz001o04jyt9xtv721",
+          "createdAt": "2026-04-14T02:48:38.379Z",
+          "originalN": 14
+        },
+        {
+          "n": 8,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v15.png",
+          "caption": "가로로 긴 사이즈로 바꿔봐, 위에 박기 좋게",
+          "editPrompt": "Modify logo #2 version 13: Change the aspect ratio to 16:9 for a banner logo. The 'splash' text should be semi-polished frosted glass with a subtle blur and glossy sheen, centered in the wide frame. The rainbow paint splash background must be fully visible behind the text, perfectly contained within the 16:9 frame without being cut off. Set on a perfectly flat, pure solid white background (#FFFFFF) with no paper texture. Professional wide studio finish.",
+          "parent": "cmny0t9ax001s04jy8g5tf7qa",
+          "createdAt": "2026-04-14T02:49:50.153Z",
+          "originalN": 15
+        },
+        {
+          "n": 9,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v17.png",
+          "caption": "글자 큼직하게 키워, 한눈에 확 들어오게",
+          "editPrompt": "In logo #2 version 16, significantly enlarge the 'splash' text to fill a larger portion of the 16:9 frame. The text should be more prominent and easily readable for a website banner or logo placeholder. The rainbow paint splash should remain centered and perfectly scale behind the larger text without being cut off. Maintain the semi-polished frosted glass texture and pure solid white (#FFFFFF) background. Professional wide web banner composition.",
+          "parent": "cmny0zc2j002404jy3ef0dd5w",
+          "createdAt": "2026-04-14T02:52:41.166Z",
+          "originalN": 17
+        },
+        {
+          "n": 10,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnxzw67s000004l45uq9lp4l/logos/cmnxzyp3t000304jyhml2aaun/v20.png",
+          "caption": "뒤에 물감은 다 지워버리고, 글자만 남기자",
+          "editPrompt": "Modify logo #2 version 19: Completely remove the rainbow paint splash from the background. Only keep the large 'splash' text made of clear, high-clarity transparent glass with strong refraction. The background must be a perfectly flat, pure solid white (#FFFFFF) with absolutely no texture or other elements. Minimalist 16:9 glass wordmark banner.",
+          "parent": "cmny17rz9002t04jy8a2qin83",
+          "createdAt": "2026-04-14T03:01:49.901Z",
+          "originalN": 20
+        }
+      ]
+    },
+    {
+      "id": "pixelquest",
+      "name": "PIXEL QUEST 로고",
+      "tagline": "게임 로고 하나를 이렇게도 저렇게도",
+      "initialPrompt": "pixel art game logo for a game titled 'PIXEL QUEST', 16-bit retro style, featuring adventure elements like a sword and a castle silhouette, vibrant gold and blue color palette with red accents, 1:1 aspect ratio, high quality pixel art, game icon style",
+      "versions": [
+        {
+          "n": 1,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnx9cdxp000004juro4o0yx4/logos/cmnx9lj7b000104ihbb1s3nmp/v1.png",
+          "caption": "옛날 게임 느낌 나는 픽셀 로고 하나 만들어줘, 검이랑 성 같이",
+          "editPrompt": null,
+          "parent": null,
+          "createdAt": "2026-04-13T14:05:12.284Z",
+          "originalN": 1
+        },
+        {
+          "n": 2,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnx9cdxp000004juro4o0yx4/logos/cmnx9lj7b000104ihbb1s3nmp/v2.png",
+          "caption": "전체적으로 초록색 계열로 싹 바꿔봐",
+          "editPrompt": "Change the overall color scheme of this logo to green tones while maintaining the pixel art style.",
+          "parent": "cmnx9lluk000204ihkar5n8q4",
+          "createdAt": "2026-04-13T15:45:34.675Z",
+          "originalN": 2
+        },
+        {
+          "n": 3,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnx9cdxp000004juro4o0yx4/logos/cmnx9lj7b000104ihbb1s3nmp/v3.png",
+          "caption": "더 초록초록하게 만들어줘...",
+          "editPrompt": "Completely change the entire color palette of the logo to various shades of green, including the frame, icon, and text. Ensure it has a distinct green theme.",
+          "parent": "cmnxd6or7000304jmrhv6830w",
+          "createdAt": "2026-04-13T15:47:15.249Z",
+          "originalN": 3
+        },
+        {
+          "n": 4,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnx9cdxp000004juro4o0yx4/logos/cmnx9lj7b000104ihbb1s3nmp/v4.png",
+          "caption": "가운데 검 두 자루는 검이랑 창이 부딪치는 걸로, 부딪치는 자리에 반짝이도 넣어",
+          "editPrompt": "Modify the icon in the center of the green-toned logo: Instead of two swords, show a sword and a spear clashing. Add a white diamond-shaped pixel sparkle effect where the two weapons collide. Keep the green pixel art style.",
+          "parent": "cmnxd8ucx000104l29eq400k9",
+          "createdAt": "2026-04-13T18:12:53.909Z",
+          "originalN": 4
+        },
+        {
+          "n": 5,
+          "url": "https://wwq0iavaos79eqki.public.blob.vercel-storage.com/users/cmnwqo4rl000004jlus8nr759/projects/cmnx9cdxp000004juro4o0yx4/logos/cmnx9lj7b000104ihbb1s3nmp/v5.png",
+          "caption": "다시 처음 금색 파랑 버전으로 돌아가서, 검이랑 창 부딪치는 걸로 바꿔줘",
+          "editPrompt": "Based on the FIRST version (v1) of logo #1 (original classic gold/blue colors), modify the icon to show a sword and a spear clashing instead of two swords. Add a white diamond-shaped pixel sparkle effect where they collide. Keep the original classic pixel art style.",
+          "parent": "cmnx9lluk000204ihkar5n8q4",
+          "createdAt": "2026-04-13T18:14:14.720Z",
+          "originalN": 5
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { signOut } from "next-auth/react"
+import { HeaderLogo } from "./header-logo"
 
 interface HeaderSession {
   user: {
@@ -60,8 +61,9 @@ export function SharedHeader({ session }: { session: HeaderSession | null }) {
     <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-[var(--border-primary)] bg-[var(--bg-primary)]/80 backdrop-blur-lg">
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-6">
         {/* Logo */}
-        <Link href="/" className="text-xl font-bold" onClick={() => setMobileOpen(false)}>
-          Sp<span className="text-[var(--accent-green)]">lash</span>
+        <Link href="/" className="flex items-center gap-2 text-xl font-bold" onClick={() => setMobileOpen(false)}>
+          <HeaderLogo />
+          <span className="sr-only">Splash</span>
         </Link>
 
         {/* Desktop Nav */}

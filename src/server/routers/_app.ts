@@ -7,6 +7,7 @@ import { exportRouter } from "./export"
 import { subscriptionRouter } from "./subscription"
 import { adminRouter } from "./admin"
 import { usageRouter } from "./usage"
+import { adminInsightsRouter } from "./admin-insights"
 
 export const appRouter = router({
   project: projectRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   subscription: subscriptionRouter,
   admin: adminRouter,
   usage: usageRouter,
+  adminInsights: adminInsightsRouter,
 })
 
 export type AppRouter = typeof appRouter

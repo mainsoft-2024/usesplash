@@ -42,8 +42,6 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
 
   const cropMut = trpc.export.crop.useMutation()
-  const bgMut = trpc.export.removeBg.useMutation()
-  const svgMut = trpc.export.vectorize.useMutation()
 
   const getVer = useCallback((logo: Logo) => logo.versions[activeIdx[logo.id] ?? 0] ?? logo.versions[0], [activeIdx])
 
@@ -284,12 +282,10 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
                 PNG 다운로드
               </button>
               <button onClick={() => cropMut.mutate({ logoVersionId: mVer.id })} disabled={cropMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{cropMut.isPending ? "크롭 중..." : "크롭"}</button>
-              <button onClick={() => bgMut.mutate({ logoVersionId: mVer.id })} disabled={bgMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{bgMut.isPending ? "제거 중..." : "배경제거"}</button>
-              <button onClick={() => svgMut.mutate({ logoVersionId: mVer.id })} disabled={svgMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{svgMut.isPending ? "변환 중..." : "SVG"}</button>
+              <span title="출시 예정" className="px-3 py-1.5 text-xs bg-[#1a1a1a] border border-dashed border-[#333] rounded-lg text-[#777] cursor-not-allowed select-none">배경제거 <span className="ml-1 text-[10px] text-[#4CAF50]/70">예정</span></span>
+              <span title="출시 예정" className="px-3 py-1.5 text-xs bg-[#1a1a1a] border border-dashed border-[#333] rounded-lg text-[#777] cursor-not-allowed select-none">SVG <span className="ml-1 text-[10px] text-[#4CAF50]/70">예정</span></span>
             </div>
             {cropMut.data && <a href={cropMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">크롭 결과 다운로드</a>}
-            {bgMut.data && <a href={bgMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">배경제거 결과 다운로드</a>}
-            {svgMut.data && <a href={svgMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">SVG 다운로드</a>}
             <div className="text-[#555] text-[11px] mt-2">← → 로고 · ↑ ↓ 버전 · F 즐겨찾기 · Esc 닫기</div>
           </div>
         </div>

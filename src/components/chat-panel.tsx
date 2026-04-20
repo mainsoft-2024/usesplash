@@ -282,7 +282,7 @@ export function ChatPanel({ chat }: ChatProps) {
         <div className={`${THREAD} flex items-center justify-between gap-3 py-3`}>
           <div>
             <h2 className="text-sm font-semibold tracking-tight text-[var(--text-primary)]">AI 디자이너</h2>
-            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">브리프 → 시안 → 수정</p>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">원하는 로고를 설명하고, 수정해달라고 요청하세요.</p>
           </div>
           <span className="rounded-md border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-tertiary)]">
             Studio
@@ -347,9 +347,20 @@ export function ChatPanel({ chat }: ChatProps) {
           {chat.error && (
             <div className="border-b border-red-900/30 bg-red-950/20" role="alert">
               <div className={`${THREAD} py-4`}>
-                <p className="text-sm text-red-200">
-                  오류: {chat.error.message || "채팅 응답에 실패했습니다"}
-                </p>
+                {(chat.error as any)?.code === "DAILY_LIMIT_REACHED" ? (
+                  <>
+                    <p className="text-sm font-medium text-red-200">
+                      일일 생성 한도 초과
+                    </p>
+                    <p className="mt-1 text-xs text-red-300/70">
+                      오늘의 묣료 생성 횟수를 모두 사용했습니다. 내일 자정(UTC) 이후에 다시 시도해주세요.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-red-200">
+                    오류: {chat.error.message || "채팅 응답에 실패했습니다"}
+                  </p>
+                )}
               </div>
             </div>
           )}
