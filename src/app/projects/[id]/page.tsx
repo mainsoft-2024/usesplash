@@ -190,7 +190,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
         {isMobile ? (
           mobilePanel === "chat" ? (
             <div className="h-full w-full">
-              <ChatPanel chat={chat} />
+              <ChatPanel chat={chat} projectId={projectId} logos={logos.data ?? []} />
             </div>
           ) : (
             <div className="h-full w-full overflow-hidden">
@@ -206,7 +206,7 @@ export default function ProjectWorkspace({ params }: { params: Promise<{ id: str
         ) : (
           <>
             <div style={{ width: `${splitPos}%` }} className="h-full flex-shrink-0">
-              <ChatPanel chat={chat} />
+              <ChatPanel chat={chat} projectId={projectId} logos={logos.data ?? []} />
             </div>
             <div className="relative w-1 flex-shrink-0">
               <div
