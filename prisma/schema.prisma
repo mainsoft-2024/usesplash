@@ -87,6 +87,7 @@ model LogoVersion {
   versionNumber   Int
   parentVersionId String?
   imageUrl        String
+  svgUrl          String?
   s3Key           String
   editPrompt      String?  @db.Text
   logo            Logo     @relation(fields: [logoId], references: [id], onDelete: Cascade)
@@ -127,7 +128,7 @@ model UsageLog {
   id        String   @id @default(cuid())
   userId    String
   projectId String?
-  type      String   // "generate" | "edit" | "llm"
+  type      String   // "generate" | "edit" | "llm" | "vectorize"
   count     Int      @default(1)
   model     String?
   imageCount Int?
@@ -151,6 +152,24 @@ model GeminiRequestLog {
   projectId    String?
   model        String
   status       String
+  httpCode     Int?
+  attempt      Int
+  latencyMs    Int
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+model RecraftRequestLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  projectId    String?
+  logoId       String?
+  versionId    String?
+  model        String   // constant "vectorize"
+  status       String   // "ok" | "retry" | "error"
   httpCode     Int?
   attempt      Int
   latencyMs    Int

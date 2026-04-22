@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { PulseSpinner } from "@/components/spinners"
+import { toast } from "sonner"
 import { useComposerStore } from "@/lib/chat/composer-store"
 import { useGallerySpotlightStore } from "@/lib/chat/gallery-spotlight-store"
 
@@ -11,6 +12,7 @@ type LogoVersion = {
   versionNumber: number
   parentVersionId: string | null
   imageUrl: string
+  svgUrl?: string | null
   editPrompt: string | null
   s3Key: string
   createdAt: Date | string
@@ -45,7 +47,8 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
   const composerProjectId = useComposerStore((state) => state.activeProjectId)
 
   const cropMut = trpc.export.crop.useMutation()
-
+  const svgMut = trpc.export.vectorize.useMutation()
+  const utils = trpc.useUtils()
   const getVer = useCallback((logo: Logo) => logo.versions[activeIdx[logo.id] ?? 0] ?? logo.versions[0], [activeIdx])
 
   const cycle = useCallback((logoId: string, dir: 1 | -1, total: number) => {
@@ -144,6 +147,22 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
     }
   }
 
+  const handleSvgClick = async (version: LogoVersion) => {
+    try {
+      const filename = `splash-logo-${mLogo?.orderIndex ?? 0}-v${version.versionNumber}.svg`
+      if (version.svgUrl) {
+        await handleDownload(version.svgUrl, filename)
+        return
+      }
+
+      const result = await svgMut.mutateAsync({ logoVersionId: version.id })
+      await handleDownload(result.url, filename)
+      await Promise.all([utils.project.invalidate(), utils.logo.invalidate()])
+    } catch {
+      toast.error("SVG 변환에 실패했습니다. 잠시 후 다시 시도해 주세요.")
+    }
+  }
+
   return (
     <div className="h-full flex flex-col bg-[#0e0e0e]">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
@@ -195,7 +214,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
 
                   {/* Top-left: Logo number badge */}
                   <span className={`absolute top-2 left-2 px-2.5 py-0.5 rounded-lg text-[10px] font-bold tracking-wide ${isRev ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
-                    #{logo.orderIndex + 1}{isRev ? ` · v${ai}` : ""}
+                    #{logo.orderIndex + 1}{isRev ? ` · v${ver.versionNumber}` : ""}
                   </span>
 
                   {/* Editing overlay — shimmer + indeterminate bar + activity spinner */}
@@ -286,7 +305,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
             <div className="relative">
               <img src={mVer.imageUrl} alt="" className="max-w-[85vw] max-h-[55vh] bg-white p-6 rounded-xl" />
               <span className={`absolute top-3 left-3 z-20 px-3 py-1 rounded-xl text-xs font-bold ${(activeIdx[mLogo.id] ?? 0) > 0 ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
-                {(activeIdx[mLogo.id] ?? 0) > 0 ? `REV v${activeIdx[mLogo.id]}` : "ORIGINAL"}
+                {(activeIdx[mLogo.id] ?? 0) > 0 ? `REV v${mVer.versionNumber}` : "ORIGINAL"}
               </span>
               {modalShowEditProgress && (
                 <>
@@ -341,7 +360,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
               </button>
               <button onClick={() => cropMut.mutate({ logoVersionId: mVer.id })} disabled={cropMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{cropMut.isPending ? "크롭 중..." : "크롭"}</button>
               <span title="출시 예정" className="px-3 py-1.5 text-xs bg-[#1a1a1a] border border-dashed border-[#333] rounded-lg text-[#777] cursor-not-allowed select-none">배경제거 <span className="ml-1 text-[10px] text-[#4CAF50]/70">예정</span></span>
-              <span title="출시 예정" className="px-3 py-1.5 text-xs bg-[#1a1a1a] border border-dashed border-[#333] rounded-lg text-[#777] cursor-not-allowed select-none">SVG <span className="ml-1 text-[10px] text-[#4CAF50]/70">예정</span></span>
+              <button onClick={() => handleSvgClick(mVer)} disabled={svgMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{svgMut.isPending ? <><PulseSpinner size={12} color="#4CAF50" /> SVG 변환 중...</> : "SVG 다운로드"}</button>
             </div>
             {cropMut.data && <a href={cropMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">크롭 결과 다운로드</a>}
             <div className="text-[#555] text-[11px] mt-2">← → 로고 · ↑ ↓ 버전 · F 즐겨찾기 · Esc 닫기</div>

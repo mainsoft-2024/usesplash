@@ -17,7 +17,7 @@ export const usageRouter = router({
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
     )
 
-    const [lifetimeAgg, todayAgg, subscription] = await Promise.all([
+    const [lifetimeAgg, todayAgg, vectorizeLifetime, vectorizeToday, subscription] = await Promise.all([
       ctx.prisma.usageLog.aggregate({
         where: { userId },
         _sum: { count: true },
@@ -28,6 +28,19 @@ export const usageRouter = router({
           createdAt: { gte: todayMidnightUTC },
         },
         _sum: { count: true },
+      }),
+      ctx.prisma.usageLog.count({
+        where: {
+          userId,
+          type: "vectorize",
+        },
+      }),
+      ctx.prisma.usageLog.count({
+        where: {
+          userId,
+          type: "vectorize",
+          createdAt: { gte: todayMidnightUTC },
+        },
       }),
       ctx.prisma.subscription.findUnique({
         where: { userId },
@@ -41,7 +54,15 @@ export const usageRouter = router({
     const today = todayAgg._sum.count ?? 0
     const remaining = dailyLimit === -1 ? -1 : Math.max(dailyLimit - today, 0)
 
-    return { total, today, remaining, tier, dailyLimit }
+    return {
+      total,
+      today,
+      remaining,
+      tier,
+      dailyLimit,
+      vectorizeToday,
+      vectorizeLifetime,
+    }
   }),
 
   getDailyChart: protectedProcedure
@@ -62,23 +83,59 @@ export const usageRouter = router({
           userId,
           createdAt: { gte: rangeStart },
         },
-        select: { createdAt: true, count: true },
+        select: { createdAt: true, count: true, type: true },
       })
 
-      const countsByDate = new Map<string, number>()
+      const countsByDate = new Map<
+        string,
+        { generate: number; edit: number; llm: number; vectorize: number; count: number }
+      >()
       for (const log of logs) {
         const key = toUTCDateKey(log.createdAt)
-        countsByDate.set(key, (countsByDate.get(key) ?? 0) + log.count)
+        const existing = countsByDate.get(key) ?? {
+          generate: 0,
+          edit: 0,
+          llm: 0,
+          vectorize: 0,
+          count: 0,
+        }
+
+        if (log.type === "generate") existing.generate += log.count
+        if (log.type === "edit") existing.edit += log.count
+        if (log.type === "llm") existing.llm += log.count
+        if (log.type === "vectorize") existing.vectorize += log.count
+        existing.count += log.count
+
+        countsByDate.set(key, existing)
       }
 
-      const chart: Array<{ date: string; count: number }> = []
+      const chart: Array<{
+        date: string
+        generate: number
+        edit: number
+        llm: number
+        vectorize: number
+        count: number
+      }> = []
       for (let i = 0; i < input.days; i++) {
         const day = new Date(rangeStart)
         day.setUTCDate(rangeStart.getUTCDate() + i)
         const key = toUTCDateKey(day)
+        const bucket = countsByDate.get(key) ?? {
+          generate: 0,
+          edit: 0,
+          llm: 0,
+          vectorize: 0,
+          count: 0,
+        }
+
         chart.push({
           date: key,
-          count: countsByDate.get(key) ?? 0,
+          generate: bucket.generate,
+          edit: bucket.edit,
+          llm: bucket.llm,
+          vectorize: bucket.vectorize,
+          count: bucket.count,
         })
       }
 

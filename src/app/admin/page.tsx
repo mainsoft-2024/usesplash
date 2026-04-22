@@ -10,6 +10,7 @@ import { CostTotalsRow } from "@/components/admin/cost-totals-row"
 import { CsvExportButton } from "@/components/admin/csv-export-button"
 import { FunnelWidget } from "@/components/admin/funnel-widget"
 import { GeminiHealthPanel } from "@/components/admin/gemini-health-panel"
+import { RecraftHealthPanel } from "@/components/admin/recraft-health-panel"
 import { HourDowHeatmap } from "@/components/admin/hour-dow-heatmap"
 import { MarginCard } from "@/components/admin/margin-card"
 import { MrrKpiRow } from "@/components/admin/mrr-kpi-row"
@@ -72,6 +73,12 @@ function OverviewTab({ period }: { period: PeriodValue }) {
         </Suspense>
         <Suspense fallback={<WidgetSkeleton className="h-64" />}>
           <GeminiHealthPanel />
+        </Suspense>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Suspense fallback={<WidgetSkeleton className="h-64" />}>
+          <RecraftHealthPanel />
         </Suspense>
       </div>
     </div>

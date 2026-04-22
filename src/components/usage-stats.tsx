@@ -9,6 +9,7 @@ type RangeDays = 7 | 30 | 90
 type ChartPoint = {
   date: string
   count: number
+  vectorize: number
   label: string
 }
 
@@ -23,6 +24,7 @@ const RechartsArea = dynamic(
         Tooltip,
         XAxis,
         YAxis,
+        Legend,
       } = mod
 
       function Chart({ data }: { data: ChartPoint[] }) {
@@ -33,6 +35,10 @@ const RechartsArea = dynamic(
                 <linearGradient id="usageGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--accent-green)" stopOpacity={0.3} />
                   <stop offset="100%" stopColor="var(--accent-green)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="vectorizeGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#ec4899" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#ec4899" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#2a2a2a" vertical={false} />
@@ -58,9 +64,19 @@ const RechartsArea = dynamic(
                 labelStyle={{ color: "#a1a1a1" }}
                 cursor={{ stroke: "var(--accent-green)", strokeOpacity: 0.25 }}
               />
+              <Legend wrapperStyle={{ color: "#a1a1a1", fontSize: 12 }} />
+              <Area
+                type="monotone"
+                dataKey="vectorize"
+                name="SVG 내보내기"
+                stroke="#ec4899"
+                strokeWidth={2}
+                fill="url(#vectorizeGradient)"
+              />
               <Area
                 type="monotone"
                 dataKey="count"
+                name="이미지 생성"
                 stroke="var(--accent-green)"
                 strokeWidth={2}
                 fill="url(#usageGradient)"
@@ -205,7 +221,7 @@ export function UsageStats() {
     )
   }
 
-  const { total, today, tier } = usageQuery.data
+  const { total, today, tier, vectorizeToday = 0, vectorizeLifetime = 0 } = usageQuery.data
   const ringRadius = 48
   const ringCircumference = 2 * Math.PI * ringRadius
   const ringOffset = ringCircumference - (animatedPercent / 100) * ringCircumference
@@ -220,7 +236,7 @@ export function UsageStats() {
         </span>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-4">
         <div className="flex flex-col items-center gap-3">
           <p className="text-sm text-[#a1a1a1]">사용량</p>
           <div className="relative h-[120px] w-[120px]">
@@ -252,6 +268,12 @@ export function UsageStats() {
           <p className="text-sm text-[#a1a1a1]">총 생성 이미지</p>
           <p className="text-4xl font-bold text-white">{total.toLocaleString()}</p>
           <p className="text-sm text-[#6b6b6b]">오늘 {today.toLocaleString()}건 생성</p>
+        </div>
+
+        <div className="flex flex-col justify-center gap-2">
+          <p className="text-sm text-[#a1a1a1]">SVG 내보내기</p>
+          <p className="text-4xl font-bold text-white">{vectorizeLifetime.toLocaleString()}</p>
+          <p className="text-sm text-[#6b6b6b]">{vectorizeToday.toLocaleString()} 오늘 / {vectorizeLifetime.toLocaleString()} 누적</p>
         </div>
 
         <div className="flex flex-col gap-3">

@@ -67,6 +67,7 @@ const CSV_FILTER_INPUT = z.object({
   search: z.string().trim().optional(),
 })
 const USER_ID_INPUT = z.object({ userId: z.string().min(1) })
+const DATE_RANGE_INPUT = z.object({ from: z.coerce.date(), to: z.coerce.date() })
 
 const toKst = (utcDate: Date) => {
   // Store timestamps in UTC; shift by +9h and read UTC parts to avoid host timezone/DST effects.
@@ -252,6 +253,7 @@ export const adminInsightsRouter = router({
       },
       select: {
         createdAt: true,
+        type: true,
         imageCostUsd: true,
         llmCostUsd: true,
         blobCostUsd: true,
@@ -259,12 +261,25 @@ export const adminInsightsRouter = router({
       orderBy: { createdAt: "asc" },
     })
 
-    const map = new Map<string, { date: string; gemini_image: number; openrouter_llm: number; vercel_blob: number }>()
+    const map = new Map<
+      string,
+      { date: string; gemini_image: number; recraft_vectorize: number; openrouter_llm: number; vercel_blob: number }
+    >()
 
     for (const row of rows) {
       const key = dateKey(row.createdAt)
-      const existing = map.get(key) ?? { date: key, gemini_image: 0, openrouter_llm: 0, vercel_blob: 0 }
-      existing.gemini_image += toNumber(row.imageCostUsd)
+      const existing = map.get(key) ?? {
+        date: key,
+        gemini_image: 0,
+        recraft_vectorize: 0,
+        openrouter_llm: 0,
+        vercel_blob: 0,
+      }
+      if (row.type === "vectorize") {
+        existing.recraft_vectorize += toNumber(row.imageCostUsd)
+      } else {
+        existing.gemini_image += toNumber(row.imageCostUsd)
+      }
       existing.openrouter_llm += toNumber(row.llmCostUsd)
       existing.vercel_blob += toNumber(row.blobCostUsd)
       map.set(key, existing)
@@ -275,6 +290,7 @@ export const adminInsightsRouter = router({
       gemini_image: Number(row.gemini_image.toFixed(6)),
       openrouter_llm: Number(row.openrouter_llm.toFixed(6)),
       vercel_blob: Number(row.vercel_blob.toFixed(6)),
+      recraft_vectorize: Number(row.recraft_vectorize.toFixed(6)),
     }))
   }),
 
@@ -585,17 +601,21 @@ export const adminInsightsRouter = router({
   }),
 
   getUserCostRevenue: adminProcedure.input(USER_ID_INPUT).query(async ({ ctx, input }) => {
-    const [user, subscription, costAgg] = await Promise.all([
+    const [user, subscription, costAgg, vectorizeCostAgg] = await Promise.all([
       ctx.prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, createdAt: true } }),
       ctx.prisma.subscription.findUnique({ where: { userId: input.userId }, select: { tier: true } }),
       ctx.prisma.usageLog.aggregate({
         where: { userId: input.userId },
         _sum: { imageCostUsd: true, llmCostUsd: true, blobCostUsd: true },
       }),
+      ctx.prisma.usageLog.aggregate({
+        where: { userId: input.userId, type: "vectorize" },
+        _sum: { imageCostUsd: true },
+      }),
     ])
 
     if (!user) {
-      return { monthlyPriceUsd: 0, ltvUsd: 0, totalCostUsd: 0, marginUsd: 0 }
+      return { monthlyPriceUsd: 0, ltvUsd: 0, totalCostUsd: 0, marginUsd: 0, vectorizeCostUsd: 0 }
     }
 
     const tier = (subscription?.tier ?? "free") as keyof typeof PLAN_PRICE_USD
@@ -605,8 +625,9 @@ export const adminInsightsRouter = router({
       toNumber(costAgg._sum.imageCostUsd) + toNumber(costAgg._sum.llmCostUsd) + toNumber(costAgg._sum.blobCostUsd)
 ).toFixed(6))
     const marginUsd = Number((ltvUsd - totalCostUsd).toFixed(6))
+    const vectorizeCostUsd = Number(toNumber(vectorizeCostAgg._sum.imageCostUsd).toFixed(6))
 
-    return { monthlyPriceUsd, ltvUsd, totalCostUsd, marginUsd }
+    return { monthlyPriceUsd, ltvUsd, totalCostUsd, marginUsd, vectorizeCostUsd }
   }),
 
   getGeminiHealth: adminProcedure.query(async ({ ctx }) => {
@@ -631,6 +652,61 @@ export const adminInsightsRouter = router({
         : 0
 
     return { rate429Pct24h, errorRatePct24h, avgRetries24h }
+  }),
+
+  getRecraftHealth: adminProcedure.query(async ({ ctx }) => {
+    const since = new Date(Date.now() - 24 * DAY_MS)
+    const rows = await ctx.prisma.recraftRequestLog.findMany({
+      where: { createdAt: { gte: since } },
+      select: { status: true, httpCode: true, attempt: true },
+    })
+
+    const totalAttempts24h = rows.length
+    if (totalAttempts24h === 0) {
+      return { rate429Pct24h: 0, errorRatePct24h: 0, avgRetries24h: 0, totalAttempts24h: 0 }
+    }
+
+    const rate429Pct24h = Number(((rows.filter((row) => row.httpCode === 429).length / totalAttempts24h) * 100).toFixed(2))
+    const errorRatePct24h = Number(((rows.filter((row) => row.status === "error").length / totalAttempts24h) * 100).toFixed(2))
+
+    const nonOkAttempts = rows.filter((row) => row.status !== "ok")
+    const avgRetries24h =
+      nonOkAttempts.length > 0
+        ? Number((nonOkAttempts.reduce((sum, row) => sum + row.attempt, 0) / nonOkAttempts.length).toFixed(2))
+        : 0
+
+    return { rate429Pct24h, errorRatePct24h, avgRetries24h, totalAttempts24h }
+  }),
+
+  getRecraftAggregates: adminProcedure.input(DATE_RANGE_INPUT).query(async ({ ctx, input }) => {
+    const rows = await ctx.prisma.recraftRequestLog.findMany({
+      where: {
+        createdAt: { gte: input.from, lte: input.to },
+      },
+      select: { status: true, latencyMs: true },
+    })
+
+    const totalsByStatus = rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.status] = (acc[row.status] ?? 0) + 1
+      return acc
+    }, {})
+
+    const latency = rows
+      .map((row) => row.latencyMs)
+      .filter((value): value is number => Number.isFinite(value))
+      .sort((a, b) => a - b)
+    const percentile = (p: number) => {
+      if (latency.length === 0) return 0
+      const idx = Math.ceil((p / 100) * latency.length) - 1
+      return latency[Math.min(Math.max(idx, 0), latency.length - 1)]
+    }
+
+    return {
+      totalsByStatus,
+      p50LatencyMs: percentile(50),
+      p95LatencyMs: percentile(95),
+      total: rows.length,
+    }
   }),
 
   getActivityFeed: adminProcedure
