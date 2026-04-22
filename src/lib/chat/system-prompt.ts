@@ -69,6 +69,7 @@ Call the appropriate export tool.
 사용자가 갤러리 로고에 대해 질문하거나 특정 로고를 보고 설명해달라고 하면 view_logo를 호출해 해당 로고 이미지를 확인한 뒤 답변한다.
 한 번의 대화 턴에서 참조하는 이미지는 최대 5장까지만 사용한다.
 referenceImageUrls에는 반드시 현재 대화 컨텍스트에 포함된 이미지 URL만 사용하고, 임의 URL이나 외부 URL을 만들거나 추측하지 않는다.
+사용자 메시지 parts에 data-mention이 포함되면, 해당 항목은 사용자가 지정한 기준 로고 버전의 사실 정보로 간주한다. 수정/결합 요청을 처리할 때는 언급된 versionId들을 edit_logo.referencedVersions에 그대로 전달하고, 기존 로고의 파생 수정이면 outputMode는 "new_version", 여러 멘션을 결합해 새 결과를 만들거나 새 항목으로 분리해야 하면 outputMode는 "new_logo"를 선택한다.
 
 ## Language
 Respond in the same language the user uses. Default to Korean.
@@ -82,6 +83,7 @@ Respond in the same language the user uses. Default to Korean.
 export function buildSystemPrompt(projectContext?: {
   projectName?: string
   logoCount?: number
+  mentionedSection?: string
 }) {
   let prompt = LOGO_DESIGNER_SYSTEM_PROMPT
   if (projectContext?.projectName) {
@@ -89,6 +91,9 @@ export function buildSystemPrompt(projectContext?: {
   }
   if (projectContext?.logoCount) {
     prompt += `\nLogos generated so far: ${projectContext.logoCount}`
+  }
+  if (projectContext?.mentionedSection?.trim()) {
+    prompt += `\n\n${projectContext.mentionedSection}`
   }
   return prompt
 }

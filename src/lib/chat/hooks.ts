@@ -3,6 +3,7 @@
 import { useChat as useAIChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { LogoMentionPart } from "./mention-types"
 
 export function useProjectChat(projectId: string, initialMessages?: UIMessage[]) {
   const [input, setInput] = useState("")
@@ -44,8 +45,17 @@ export function useProjectChat(projectId: string, initialMessages?: UIMessage[])
   }, [initialMessages])
 
   const sendMessage = useCallback(
-    (content: string, fileParts?: Array<{ type: "file"; mediaType: string; url: string }>) => {
-      if (fileParts?.length) {
+    (
+      content: string,
+      fileParts?: Array<{ type: "file"; mediaType: string; url: string }>,
+      mentionParts?: LogoMentionPart[]
+    ) => {
+      if (mentionParts?.length) {
+        chat.sendMessage({
+          role: "user",
+          parts: [{ type: "text" as const, text: content }, ...(fileParts ?? []), ...mentionParts],
+        })
+      } else if (fileParts?.length) {
         chat.sendMessage({
           role: "user",
           parts: [{ type: "text" as const, text: content }, ...fileParts],

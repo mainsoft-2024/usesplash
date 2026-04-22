@@ -121,3 +121,50 @@ describe("gemini request logging", () => {
     })
   })
 })
+
+
+describe("editLogoImage reference contents", () => {
+  beforeEach(() => {
+    generateContentMock.mockReset()
+    process.env.GEMINI_API_KEY = "test-key"
+  })
+
+  it("builds contents with source, references, instruction, and prompt", async () => {
+    generateContentMock.mockResolvedValueOnce(OK_RESPONSE)
+
+    const source = Buffer.from("source-image")
+    const ref1 = { data: "cmVmLTE=", mimeType: "image/png" }
+    const ref2 = { data: "cmVmLTI=", mimeType: "image/jpeg" }
+
+    await editLogoImage("edit prompt", source, "image/png", [ref1, ref2])
+
+    expect(generateContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: [
+          { inlineData: { mimeType: "image/png", data: source.toString("base64") } },
+          { inlineData: ref1 },
+          { inlineData: ref2 },
+          "Image 1: source to edit. Images 2..N: reference for style/content.",
+          "edit prompt",
+        ],
+      }),
+    )
+  })
+
+  it("builds contents with source and prompt when references are absent", async () => {
+    generateContentMock.mockResolvedValueOnce(OK_RESPONSE)
+
+    const source = Buffer.from("source-image")
+
+    await editLogoImage("edit prompt", source, "image/png")
+
+    expect(generateContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: [
+          { inlineData: { mimeType: "image/png", data: source.toString("base64") } },
+          "edit prompt",
+        ],
+      }),
+    )
+  })
+})

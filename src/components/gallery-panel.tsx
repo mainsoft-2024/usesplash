@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect } from "react"
 import { trpc } from "@/lib/trpc/client"
 import { PulseSpinner } from "@/components/spinners"
+import { useComposerStore } from "@/lib/chat/composer-store"
+import { useGallerySpotlightStore } from "@/lib/chat/gallery-spotlight-store"
 
 type LogoVersion = {
   id: string
@@ -36,10 +38,11 @@ type GalleryProps = {
   onRefresh: () => void
   toolActivity?: ToolActivity
 }
-export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: GalleryProps) {
+export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActivity }: GalleryProps) {
   const [activeIdx, setActiveIdx] = useState<Record<string, number>>({})
   const [modalIdx, setModalIdx] = useState<number | null>(null)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const composerProjectId = useComposerStore((state) => state.activeProjectId)
 
   const cropMut = trpc.export.crop.useMutation()
 
@@ -66,6 +69,36 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
     window.addEventListener("keydown", h)
     return () => window.removeEventListener("keydown", h)
   }, [modalIdx, logos, cycle, getVer])
+
+  useEffect(() => {
+    const highlighted = new Map<HTMLElement, number>()
+    const unsubscribe = useGallerySpotlightStore.subscribe((state, prevState) => {
+      const versionId = state.spotlightVersionId
+      if (!versionId || versionId === prevState.spotlightVersionId) return
+
+      const targetEl = document.getElementById(`logo-version-${versionId}`)
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: "smooth", block: "center" })
+        targetEl.classList.add("ring-2", "ring-[#ffb74d]")
+        const timeoutId = window.setTimeout(() => {
+          targetEl.classList.remove("ring-2", "ring-[#ffb74d]")
+          highlighted.delete(targetEl)
+        }, 1200)
+        highlighted.set(targetEl, timeoutId)
+      }
+
+      useGallerySpotlightStore.getState().clear()
+    })
+
+    return () => {
+      unsubscribe()
+      highlighted.forEach((timeoutId, element) => {
+        window.clearTimeout(timeoutId)
+        element.classList.remove("ring-2", "ring-[#ffb74d]")
+      })
+      highlighted.clear()
+    }
+  }, [])
 
   if (isLoading) return <div className="h-full flex-1 overflow-y-auto p-4">
     <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
@@ -153,7 +186,11 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
                 className={`group relative rounded-2xl overflow-hidden border transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_12px_34px_rgba(0,0,0,0.45)] ${hasRevs ? "border-[#333]" : "border-[#2a2a2a]"} ${isBeingEdited ? "ring-2 ring-[#ffb74d] ring-offset-2 ring-offset-[#0e0e0e] gallery-card-editing z-[1]" : ""} ${justEdited ? "ring-2 ring-[#4CAF50] ring-offset-2 ring-offset-[#0e0e0e]" : ""}`}
               >
                 {/* Fixed aspect ratio container — this NEVER changes height */}
-                <div className="relative bg-white cursor-pointer aspect-square overflow-hidden" onClick={() => setModalIdx(idx)}>
+                <div
+                  id={`logo-version-${ver.id}`}
+                  className="relative bg-white cursor-pointer aspect-square overflow-hidden"
+                  onClick={() => setModalIdx(idx)}
+                >
                   <img src={ver.imageUrl} alt="" className="w-full h-full object-contain" />
 
                   {/* Top-left: Logo number badge */}
@@ -203,11 +240,32 @@ export function GalleryPanel({ logos, isLoading, onRefresh, toolActivity }: Gall
                     </div>
                   )}
 
+                  <button
+                    data-testid={`mention-button-${ver.id}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const added = useComposerStore.getState().addMention(projectId, {
+                        logoId: logo.id,
+                        versionId: ver.id,
+                        orderIndex: logo.orderIndex,
+                        versionNumber: ver.versionNumber,
+                        imageUrl: ver.imageUrl,
+                      })
+                      if (!added) return
+                    }}
+                    disabled={Boolean(composerProjectId && composerProjectId !== projectId)}
+                    title={composerProjectId && composerProjectId !== projectId ? "현재 열린 채팅 프로젝트와 달라 인용할 수 없어요" : undefined}
+                    className="absolute top-1.5 right-10 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity border-none hover:bg-[rgba(76,175,80,0.7)] disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-[rgba(0,0,0,0.5)]"
+                  >
+                    @
+                  </button>
+
                   {/* Version navigation buttons */}
                   {hasRevs && (<>
                     <button onClick={(e) => { e.stopPropagation(); cycle(logo.id, -1, logo.versions.length) }} className="absolute top-1.5 right-2 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity border-none hover:bg-[rgba(76,175,80,0.7)]">▲</button>
                     <button onClick={(e) => { e.stopPropagation(); cycle(logo.id, 1, logo.versions.length) }} className="absolute bottom-1.5 right-2 bg-[rgba(0,0,0,0.5)] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity border-none hover:bg-[rgba(76,175,80,0.7)]">▼</button>
-                  </>)}
+                  </>) }
                 </div>
               </div>
             )

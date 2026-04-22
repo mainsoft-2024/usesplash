@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { httpBatchLink } from "@trpc/client"
 import { useState } from "react"
 import superjson from "superjson"
+import { Toaster } from "sonner"
 import { trpc } from "@/lib/trpc/client"
 
 function getBaseUrl() {
@@ -26,7 +27,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+        <Toaster position="top-center" />
+      </QueryClientProvider>
     </trpc.Provider>
   )
 }

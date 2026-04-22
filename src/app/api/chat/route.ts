@@ -5,8 +5,16 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { buildSystemPrompt } from "@/lib/chat/system-prompt"
 import { limitImagesPerTurn, reorderPartsTextFirst } from "@/lib/chat/vision-utils"
-import { generateLogoImage, editLogoImage, withGeminiConcurrency } from "@/lib/gemini"
+import { editLogoImage, generateLogoImage, withGeminiConcurrency } from "@/lib/gemini"
 import { uploadImage, getStorageKey, resizeAndUploadImage } from "@/lib/storage"
+import {
+  extractMentionParts,
+  MentionValidationError,
+  renderMentionedVersionsForPrompt,
+  validateMentions,
+  fetchImageBufferFromUrl,
+} from "./mentions"
+import { runEditLogo } from "./edit-logo"
 import { TIER_LIMITS } from "@/server/routers/subscription"
 import { blobCost, imageCost, llmCost } from "@/lib/pricing"
 
@@ -79,12 +87,10 @@ export async function POST(req: Request) {
   }
 
   const userId = session.user.id
-  const systemPrompt = buildSystemPrompt({
-    projectName: project.name,
-    logoCount: project._count.logos,
-  })
-
   const lastUserMsg = messages[messages.length - 1]
+  let mentionedSection = ""
+  let mentionedVersions: Array<{ imageUrl: string }> = []
+
   if (lastUserMsg?.role === "user") {
     for (const part of lastUserMsg.parts ?? []) {
       if (part.type !== "file") continue
@@ -107,7 +113,36 @@ export async function POST(req: Request) {
         })
       }
     }
+
+    const mentions = extractMentionParts(lastUserMsg)
+    if (mentions.length > 0) {
+      try {
+        const versions = await validateMentions(mentions, projectId, prisma)
+        mentionedVersions = versions
+        const mentionFileParts = versions.map((version) => ({
+          type: "file" as const,
+          mediaType: "image/png",
+          url: version.imageUrl,
+        }))
+        lastUserMsg.parts = [...(lastUserMsg.parts ?? []), ...mentionFileParts]
+        mentionedSection = renderMentionedVersionsForPrompt(versions)
+      } catch (error) {
+        if (error instanceof MentionValidationError) {
+          return Response.json(
+            { error: "mention_invalid", missingVersionIds: error.missingVersionIds },
+            { status: 400 }
+          )
+        }
+        throw error
+      }
+    }
   }
+
+  const systemPrompt = buildSystemPrompt({
+    projectName: project.name,
+    logoCount: project._count.logos,
+    mentionedSection,
+  } as { projectName?: string; logoCount?: number; mentionedSection?: string })
 
   // Save user message to DB
   if (lastUserMsg?.role === "user") {
@@ -162,6 +197,9 @@ export async function POST(req: Request) {
   }
   for (const imageUrl of latestViewLogoUrls) {
     allowedReferenceUrls.add(imageUrl)
+  }
+  for (const version of mentionedVersions) {
+    allowedReferenceUrls.add(version.imageUrl)
   }
 
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user")
@@ -349,13 +387,18 @@ export async function POST(req: Request) {
       }),
 
       edit_logo: tool({
-        description: "Edit an existing logo image based on user instructions. Uses the source image as input for editing (not regeneration).",
+        description: "Edit an existing logo image. Use referencedVersions for mention IDs and outputMode to choose between editing current logo or creating a new logo.",
         inputSchema: z.object({
-          logoOrderIndex: z.number().describe("The logo number (1-based display index) to edit"),
+          logoOrderIndex: z.number().optional().describe("The logo number (1-based display index) to edit"),
           versionNumber: z.number().optional().describe("Specific version number to edit from. If omitted, uses latest version."),
           editPrompt: z.string().describe("Description of the edit to apply"),
+          referencedVersions: z.array(z.string()).max(3).optional().describe("Mentioned logoVersion IDs to use as references"),
+          outputMode: z
+            .enum(["new_version", "new_logo"])
+            .optional()
+            .describe("new_version edits an existing logo, new_logo creates a new logo entry"),
         }),
-        execute: async ({ logoOrderIndex, versionNumber, editPrompt }) => {
+        execute: async ({ logoOrderIndex, versionNumber, editPrompt, referencedVersions, outputMode }) => {
           // Re-check limit before edit
           let sub = await prisma.subscription.findUnique({
             where: { userId },
@@ -376,65 +419,28 @@ export async function POST(req: Request) {
             }
           }
 
-          const logo = await prisma.logo.findFirst({
-            where: { projectId, orderIndex: logoOrderIndex - 1 },
-            include: {
-              versions: { orderBy: { versionNumber: "desc" } },
+          const result = await runEditLogo(
+            {
+              logoOrderIndex,
+              versionNumber,
+              editPrompt,
+              referencedVersions,
+              outputMode,
             },
-          })
-          if (!logo || logo.versions.length === 0) {
-            return { error: `Logo #${logoOrderIndex} not found` }
-          }
-
-          // Select version
-          const sourceVersion = versionNumber
-            ? logo.versions.find((v) => v.versionNumber === versionNumber)
-            : logo.versions[0] // latest (desc order)
-          if (!sourceVersion) {
-            return { error: `Version ${versionNumber} not found for logo #${logoOrderIndex}` }
-          }
-
-          // Download source image
-          const imgRes = await fetch(sourceVersion.imageUrl)
-          if (!imgRes.ok) {
-            return {
-              error: `Failed to load logo #${logoOrderIndex} source image (v${sourceVersion.versionNumber}). Please retry.`,
+            {
+              prisma,
+              projectId,
+              userId,
+              editLogoImage,
+              fetchImageBufferFromUrl,
+              uploadImage,
+              getStorageKey,
             }
-          }
-          const sourceBuffer = Buffer.from(await imgRes.arrayBuffer())
-
-          let result: Awaited<ReturnType<typeof editLogoImage>>
-          try {
-            result = await editLogoImage(editPrompt, sourceBuffer)
-          } catch (error) {
-            return {
-              error: `Image editing failed due to an upstream Gemini error: ${error instanceof Error ? error.message : "Unknown error"}. Please retry in 30 seconds.`,
-            }
-          }
-          if (!result) {
-            return {
-              error: "Image editing did not return an image. This is usually a temporary provider issue (429/503). Please retry in 30 seconds.",
-            }
-          }
-
-          const nextVersion = (logo.versions[0]?.versionNumber ?? 0) + 1
-          const s3Key = getStorageKey(userId, projectId, logo.id, `v${nextVersion}`)
-          const { url: imageUrl, bytes: blobBytes } = await uploadImage(
-            s3Key,
-            result.imageBuffer,
-            result.mimeType
           )
 
-          const newVersion = await prisma.logoVersion.create({
-            data: {
-              logoId: logo.id,
-              versionNumber: nextVersion,
-              parentVersionId: sourceVersion.id,
-              imageUrl,
-              s3Key,
-              editPrompt,
-            },
-          })
+          if ("error" in result) {
+            return result
+          }
 
           // Update usage
           await prisma.subscription.upsert({
@@ -451,18 +457,18 @@ export async function POST(req: Request) {
               model: "gemini-3-pro-image-preview",
               imageCount: 1,
               imageCostUsd: imageCost(1),
-              blobBytes,
-              blobCostUsd: blobCost(blobBytes),
+              blobBytes: result.blobBytes,
+              blobCostUsd: blobCost(result.blobBytes),
             },
           })
 
           return {
-            logoId: logo.id,
-            logoIndex: logoOrderIndex,
-            versionId: newVersion.id,
-            versionNumber: nextVersion,
-            imageUrl,
-            editedFrom: sourceVersion.versionNumber,
+            logoId: result.logoId,
+            logoIndex: result.logoIndex,
+            versionId: result.versionId,
+            versionNumber: result.versionNumber,
+            imageUrl: result.imageUrl,
+            editedFrom: result.editedFrom,
           }
         },
       }),

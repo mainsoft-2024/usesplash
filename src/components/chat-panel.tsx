@@ -1,13 +1,29 @@
 "use client"
 
-import { useRef, useEffect, useState, useMemo, useCallback } from "react"
+import { useRef, useEffect, useState, useMemo, useCallback, type ReactNode } from "react"
 import type { UIMessage } from "ai"
 import type { useProjectChat } from "@/lib/chat/hooks"
+import type { LogoMentionData, LogoMentionPart } from "@/lib/chat/mention-types"
+import { useComposerStore } from "@/lib/chat/composer-store"
 import { PulseSpinner, WaveSpinner } from "@/components/spinners"
 import { ChatMarkdown } from "@/components/chat-markdown"
+import { MentionChip } from "@/components/chat/mention-chip"
+import { LogoMentionPicker } from "@/components/chat/logo-mention-picker"
+import { useGallerySpotlightStore } from "@/lib/chat/gallery-spotlight-store"
 
 type ChatProps = {
   chat: ReturnType<typeof useProjectChat>
+  projectId?: string
+  logos?: Array<{
+    id: string
+    orderIndex: number
+    versions: Array<{
+      id: string
+      versionNumber: number
+      imageUrl: string
+      createdAt?: string | Date
+    }>
+  }>
 }
 
 const THREAD = "mx-auto w-full max-w-[44rem] px-4 sm:px-6"
@@ -31,6 +47,7 @@ function getToolData(part: unknown) {
 type Segment =
   | { kind: "text"; content: string }
   | { kind: "image"; url: string; mediaType: string }
+  | { kind: "mention"; data: LogoMentionData; index: number }
   | { kind: "tool"; part: NonNullable<UIMessage["parts"]>[number]; index: number }
 function buildSegments(parts: UIMessage["parts"]): Segment[] {
   if (!parts?.length) return []
@@ -59,6 +76,11 @@ function buildSegments(parts: UIMessage["parts"]): Segment[] {
       })
       return
     }
+    if (part.type === "data-mention") {
+      flushText()
+      segments.push({ kind: "mention", data: (part as any).data as LogoMentionData, index })
+      return
+    }
     flushText()
     segments.push({ kind: "tool", part, index })
   })
@@ -66,16 +88,44 @@ function buildSegments(parts: UIMessage["parts"]): Segment[] {
   return segments
 }
 
-export function ChatPanel({ chat }: ChatProps) {
+export function ChatPanel({ chat, projectId, logos = [] }: ChatProps) {
   const endRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [isFocused, setIsFocused] = useState(false)
+  const [isComposing, setIsComposing] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState("")
+  const [mentionTokenRange, setMentionTokenRange] = useState<{ start: number; end: number } | null>(null)
+
+  const mentionsByProject = useComposerStore((state) => state.mentionsByProject)
+  const addMention = useComposerStore((state) => state.addMention)
+  const removeMention = useComposerStore((state) => state.removeMention)
+  const mentions = projectId ? (mentionsByProject[projectId] ?? []) : []
+
+  const mentionableVersions = useMemo<LogoMentionData[]>(
+    () =>
+      logos.flatMap((logo) =>
+        logo.versions.map((version) => ({
+          logoId: logo.id,
+          versionId: version.id,
+          orderIndex: logo.orderIndex,
+          versionNumber: version.versionNumber,
+          imageUrl: version.imageUrl,
+        }))
+      ),
+    [logos]
+  )
 
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewUrlMapRef = useRef(new Map<File, string>())
   const MAX_FILE_SIZE = 4 * 1024 * 1024
   const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic", "image/heif"]
+
+  useEffect(() => {
+    if (!projectId) return
+    useComposerStore.getState().setActiveProject(projectId)
+  }, [projectId])
 
   useEffect(() => {
     return () => {
@@ -160,6 +210,34 @@ export function ChatPanel({ chat }: ChatProps) {
     event.target.value = ""
   }, [ACCEPTED_TYPES, MAX_FILE_SIZE])
 
+  const handleMentionSelect = useCallback(
+    (selected: LogoMentionData) => {
+      if (!projectId) return
+      const added = addMention(projectId, selected)
+      if (!added) {
+        setPickerOpen(false)
+        return
+      }
+
+      if (mentionTokenRange) {
+        const nextValue = `${chat.input.slice(0, mentionTokenRange.start)}${chat.input.slice(mentionTokenRange.end)}`
+        chat.setInput(nextValue)
+        requestAnimationFrame(() => {
+          if (!inputRef.current) return
+          inputRef.current.focus()
+          inputRef.current.setSelectionRange(mentionTokenRange.start, mentionTokenRange.start)
+          inputRef.current.style.height = "auto"
+          inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 160)}px`
+        })
+      }
+
+      setMentionQuery("")
+      setMentionTokenRange(null)
+      setPickerOpen(false)
+    },
+    [addMention, chat, mentionTokenRange, projectId]
+  )
+
   const submitMessage = useCallback(async () => {
     if (chat.isLoading) return
 
@@ -168,11 +246,19 @@ export function ChatPanel({ chat }: ChatProps) {
     if (!content && !hasFiles) return
 
     const fileParts = hasFiles ? await convertFilesToDataURLParts(attachedFiles) : undefined
-    chat.sendMessage(content, fileParts)
+    const mentionParts: LogoMentionPart[] = projectId
+      ? (useComposerStore.getState().mentionsByProject[projectId] ?? []).map((data) => ({ type: "data-mention", data }))
+      : []
+
+    chat.sendMessage(content, fileParts, mentionParts.length > 0 ? mentionParts : undefined)
     chat.setInput("")
+    setPickerOpen(false)
+    setMentionQuery("")
+    setMentionTokenRange(null)
     if (inputRef.current) inputRef.current.style.height = "auto"
     clearAttachedFiles()
-  }, [attachedFiles, chat, clearAttachedFiles, convertFilesToDataURLParts])
+    if (projectId) useComposerStore.getState().clear(projectId)
+  }, [attachedFiles, chat, clearAttachedFiles, convertFilesToDataURLParts, projectId])
 
   const handleFormSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
@@ -189,7 +275,6 @@ export function ChatPanel({ chat }: ChatProps) {
     () => ["픽셀아트 게임 로고", "미니멀 테크 스타트업", "마스코트 캐릭터 로고"],
     []
   )
-
   function renderToolPart(part: Segment & { kind: "tool" }, key: string) {
     const p = part.part
 
@@ -328,15 +413,55 @@ export function ChatPanel({ chat }: ChatProps) {
                     {segments.length === 0 ? (
                       <p className="text-sm text-[var(--text-dim)]">…</p>
                     ) : (
-                      segments.map((seg, si) => {
-                        if (seg.kind === "text") {
-                          return <ChatMarkdown key={`t-${si}`} content={seg.content} />
+                      (() => {
+                        const rendered: ReactNode[] = []
+                        for (let si = 0; si < segments.length; si += 1) {
+                          const seg = segments[si]
+                          if (seg.kind === "mention") {
+                            const mentionRun: Array<Segment & { kind: "mention" }> = [seg]
+                            while (si + 1 < segments.length && segments[si + 1]?.kind === "mention") {
+                              const next = segments[si + 1]
+                              if (next?.kind === "mention") mentionRun.push(next)
+                              si += 1
+                            }
+                            rendered.push(
+                              <div key={`mrow-${mentionRun[0]?.index ?? si}-${si}`} className="mb-2 flex flex-wrap gap-1">
+                                {mentionRun.map((mention, mentionIdx) => {
+                                  const available = logos.some((logo) => logo.versions.some((version) => version.id === mention.data.versionId))
+                                  return (
+                                    <MentionChip
+                                      key={`m-${mention.index}-${mentionIdx}`}
+                                      data={mention.data}
+                                      onClick={() => {
+                                        useGallerySpotlightStore.getState().spotlight(mention.data.versionId)
+                                      }}
+                                      disabled={!available}
+                                    />
+                                  )
+                                })}
+                              </div>
+                            )
+                            continue
+                          }
+                          if (seg.kind === "text") {
+                            rendered.push(<ChatMarkdown key={`t-${si}`} content={seg.content} />)
+                            continue
+                          }
+                          if (seg.kind === "image") {
+                            rendered.push(
+                              <img
+                                key={`img-${si}`}
+                                src={seg.url}
+                                alt="첨부 이미지"
+                                className="mt-2 max-h-64 max-w-xs rounded-lg border border-[var(--border-primary)]"
+                              />
+                            )
+                            continue
+                          }
+                          rendered.push(renderToolPart(seg, `tool-${seg.index}-${si}`))
                         }
-                        if (seg.kind === "image") {
-                          return <img key={`img-${si}`} src={seg.url} alt="첨부 이미지" className="mt-2 max-h-64 max-w-xs rounded-lg border border-[var(--border-primary)]" />
-                        }
-                        return renderToolPart(seg, `tool-${seg.index}-${si}`)
-                      })
+                        return rendered
+                      })()
                     )}
                   </div>
                 </div>
@@ -387,7 +512,7 @@ export function ChatPanel({ chat }: ChatProps) {
       />
       <form onSubmit={handleFormSubmit} className="shrink-0 border-t border-[var(--divider)] bg-[var(--bg-primary)] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
         <div className={`${THREAD}`}>
-          <div className="rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-1.5 shadow-[0_0_0_1px_rgb(0_0_0/0.02)] transition-shadow focus-within:border-[var(--accent-green)]/35 focus-within:ring-2 focus-within:ring-[var(--accent-green)]/20">
+          <div className="relative rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-1.5 shadow-[0_0_0_1px_rgb(0_0_0/0.02)] transition-shadow focus-within:border-[var(--accent-green)]/35 focus-within:ring-2 focus-within:ring-[var(--accent-green)]/20">
             {attachedFiles.length > 0 && (
               <div className="mb-2 flex gap-2 overflow-x-auto px-1">
                 {attachedFiles.map((file, index) => (
@@ -405,6 +530,23 @@ export function ChatPanel({ chat }: ChatProps) {
                 ))}
               </div>
             )}
+            {mentions.length > 0 && (
+              <div className="flex flex-wrap gap-1 px-3 pb-1 pt-1">
+                {mentions.map((mention) => (
+                  <MentionChip
+                    key={mention.versionId}
+                    data={mention}
+                    onRemove={
+                      projectId
+                        ? () => {
+                            removeMention(projectId, mention.versionId)
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )}
             <div className="flex items-end gap-2">
               <button
                 type="button"
@@ -419,13 +561,67 @@ export function ChatPanel({ chat }: ChatProps) {
                 value={chat.input}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
+                onCompositionStart={() => setIsComposing(true)}
+                onCompositionEnd={() => setIsComposing(false)}
                 onChange={(e) => {
-                  chat.setInput(e.target.value)
+                  const nextValue = e.target.value
+                  chat.setInput(nextValue)
                   e.target.style.height = "auto"
                   e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`
+
+                  const nativeEvent = e.nativeEvent as unknown as { isComposing?: boolean }
+                  const composing =
+                    isComposing ||
+                    Boolean(nativeEvent.isComposing)
+
+                  if (composing || !projectId) {
+                    setPickerOpen(false)
+                    return
+                  }
+
+                  const caret = e.target.selectionStart ?? nextValue.length
+                  const beforeCaret = nextValue.slice(0, caret)
+                  const match = /(^|\s)@([^\s]*)$/.exec(beforeCaret)
+                  if (!match) {
+                    setPickerOpen(false)
+                    setMentionTokenRange(null)
+                    return
+                  }
+
+                  const mentionStart = (match.index ?? 0) + match[1].length
+                  const atStart = mentionStart
+                  const atEnd = caret
+
+                  setMentionQuery(match[2] ?? "")
+                  setMentionTokenRange({ start: atStart, end: atEnd })
+                  setPickerOpen(true)
                 }}
                 onKeyDown={(e) => {
-                  if (e.nativeEvent.isComposing || ("isComposing" in e && e.isComposing)) return
+                  const composing =
+                    e.nativeEvent.isComposing ||
+                    Boolean((e.nativeEvent as unknown as { isComposing?: boolean }).isComposing)
+                  if (composing) return
+
+                  if (e.key === "Backspace") {
+                    if (
+                      mentions.length > 0 &&
+                      e.currentTarget.selectionStart === 0 &&
+                      e.currentTarget.selectionEnd === 0 &&
+                      projectId
+                    ) {
+                      e.preventDefault()
+                      const lastMention = mentions[mentions.length - 1]
+                      if (lastMention) removeMention(projectId, lastMention.versionId)
+                    }
+                    return
+                  }
+
+                  if (e.key === "Escape" && pickerOpen) {
+                    e.preventDefault()
+                    setPickerOpen(false)
+                    return
+                  }
+
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
                     if ((chat.input.trim() || attachedFiles.length > 0) && !chat.isLoading) {
@@ -455,6 +651,16 @@ export function ChatPanel({ chat }: ChatProps) {
                 </button>
               )}
             </div>
+            <LogoMentionPicker
+              versions={mentionableVersions}
+              open={pickerOpen}
+              query={mentionQuery}
+              onQueryChange={setMentionQuery}
+              onSelect={handleMentionSelect}
+              onClose={() => {
+                setPickerOpen(false)
+              }}
+            />
           </div>
           {isFocused && (
             <p className="mt-2 text-center text-[10px] text-[var(--text-muted)]">Shift+Enter 줄바꿈 · 마크다운</p>

@@ -186,10 +186,18 @@ export async function generateLogoImage(
 export async function editLogoImage(
   prompt: string,
   sourceImageBuffer: Buffer,
-  sourceMimeType = "image/png"
-): Promise<{ imageBuffer: Buffer; mimeType: string } | null> {
+  sourceMimeType = "image/png",
+  extraReferences?: Array<{ data: string; mimeType: string }>
+ ): Promise<{ imageBuffer: Buffer; mimeType: string } | null> {
   const ai = getClient()
   const base64 = sourceImageBuffer.toString("base64")
+  const referenceImages = extraReferences?.slice(0, 3) ?? []
+  const contents = [
+    { inlineData: { mimeType: sourceMimeType, data: base64 } },
+    ...referenceImages.map((referenceImage) => ({ inlineData: { mimeType: referenceImage.mimeType, data: referenceImage.data } })),
+    ...(referenceImages.length ? ["Image 1: source to edit. Images 2..N: reference for style/content."] : []),
+    prompt,
+  ]
   let attempt = 0
 
   let response: Awaited<ReturnType<typeof ai.models.generateContent>>
@@ -201,10 +209,7 @@ export async function editLogoImage(
       try {
         const result = await ai.models.generateContent({
           model: MODEL_NAME,
-          contents: [
-            { inlineData: { mimeType: sourceMimeType, data: base64 } },
-            prompt,
-          ],
+          contents,
           config: {
             responseModalities: ["IMAGE", "TEXT"],
           },
