@@ -160,6 +160,13 @@ npx vercel --prod               # Deploy to production
 - Custom model via `openrouter(modelId)`, NOT `openrouter.chat(modelId)`
 - Default model: `google/gemini-3-flash-preview`
 
+### Logo mentions
+- `data-mention` parts live inside `ChatMessage.parts` JSON — no DB migration; each carries `{ logoId, versionId, orderIndex, versionNumber, imageUrl }`
+- Cap 3 mentions per message, deduped by `versionId`; enforced client-side via `composerStore` (Zustand) and server-side via `validateMentions` (cross-project rejected with `400 mention_invalid`)
+- Composer state lives in `web/src/lib/chat/composer-store.ts`; history-chip → gallery highlight via `web/src/lib/chat/gallery-spotlight-store.ts`; `<Toaster />` (sonner) mounted in `providers.tsx` for the cap toast
+- Gallery version cards expose a hover `@ 인용` button that pushes a chip into the active project's composer; disabled when the composer's `activeProjectId` differs
+- `edit_logo` tool gained `referencedVersions: string[] (≤3)` + `outputMode: "new_version" | "new_logo"`; server appends validated mention `imageUrl`s as `file` parts on the user message so the LLM sees the actual images
+
 ## Known Issues / Gotchas
 
 1. **Korean IME**: `onKeyDown` must check `e.nativeEvent.isComposing` to avoid double-submit

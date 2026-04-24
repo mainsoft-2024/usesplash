@@ -2,9 +2,7 @@
 
 ## Purpose
 Provide a tab-based admin insights dashboard that makes cost, revenue, user health, and operational risk visible in one place.
-
 ## Requirements
-
 ### Requirement: Tab-based admin dashboard layout
 The admin dashboard at `/admin` SHALL present five tabs in this order: `개요`, `비용`, `수익`, `사용자`, `자료`. The active tab SHALL be reflected in the URL as `?tab=<id>` so tabs are deep-linkable and bookmarkable.
 
@@ -142,3 +140,28 @@ The dashboard SHALL show dismissible alert banners at the top (above tabs) whene
 #### Scenario: Two conditions true simultaneously
 - **WHEN** margin% is 60 AND error rate is 8%
 - **THEN** both banners render stacked (red above yellow)
+
+### Requirement: Recraft rate-limit and error panel
+The admin Overview tab SHALL include a `RecraftHealthPanel` component, parallel to `GeminiHealthPanel`, summarizing vectorize health over the selected date range: total attempts, success rate, error rate by HTTP code, p50/p95 latency. Data source: `RecraftRequestLog`.
+
+#### Scenario: Operator opens Overview
+- **WHEN** admin opens the Overview tab
+- **THEN** the Recraft health panel renders alongside Gemini health panel
+- **AND** shows counts by status and p50/p95 latency for the active date range
+
+#### Scenario: No vectorize activity
+- **WHEN** the date range has zero vectorize attempts
+- **THEN** the panel shows "No vectorize activity" placeholder without erroring
+
+### Requirement: User dashboard SVG export visibility
+The user dashboard `UsageStats` component SHALL include a "SVG exports" KPI card showing today's count and lifetime count, sourced from `UsageLog` where `type="vectorize"`. The existing 7/30/90-day chart SHALL include a vectorize series layered on top of generate/edit.
+
+#### Scenario: User views dashboard
+- **WHEN** a user with past vectorize events opens their dashboard
+- **THEN** the "SVG exports" card displays the correct today + lifetime count
+- **AND** the 7-day chart shows a vectorize line/area
+
+#### Scenario: User with zero exports
+- **WHEN** a user who has never exported SVG opens their dashboard
+- **THEN** the card shows "0 오늘 / 0 누적" and the chart vectorize series is flat at zero
+

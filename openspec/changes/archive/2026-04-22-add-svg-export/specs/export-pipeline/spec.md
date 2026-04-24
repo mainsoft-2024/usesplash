@@ -1,23 +1,4 @@
-# export-pipeline Specification
-
-## Purpose
-TBD - created by archiving change logo-saas-webapp. Update Purpose after archive.
-## Requirements
-### Requirement: Crop whitespace
-The system SHALL crop whitespace from logo images and center the content in a 1:1 square. This SHALL use the Sharp library in Node.js.
-
-#### Scenario: Crop logo
-- **WHEN** user requests crop on a logo version
-- **THEN** system removes white margins, centers content in square canvas
-- **AND** saves result to S3 and returns download URL
-
-### Requirement: Background removal
-The system SHALL remove backgrounds from logo images using remove.bg API. Requires REMOVE_BG_API_KEY.
-
-#### Scenario: Remove background
-- **WHEN** user requests background removal
-- **THEN** system sends image to remove.bg API
-- **AND** saves transparent PNG result to S3
+## MODIFIED Requirements
 
 ### Requirement: SVG vectorization
 The system SHALL convert raster logos to SVG using the Recraft API and immediately persist the resulting SVG to Vercel Blob. The produced SVG URL SHALL be stored on the source `LogoVersion.svgUrl` field for idempotent re-download. The system MUST NOT retain any third-party provider-side storage. Requires `RECRAFT_API_KEY`.
@@ -63,4 +44,3 @@ The system SHALL provide direct Vercel Blob URLs for downloading exported files,
 #### Scenario: Download exported file
 - **WHEN** user clicks download on an exported asset
 - **THEN** browser downloads the file via the stored Blob URL
-

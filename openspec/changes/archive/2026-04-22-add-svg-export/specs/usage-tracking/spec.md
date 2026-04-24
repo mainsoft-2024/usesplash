@@ -1,8 +1,5 @@
-# usage-tracking
+## MODIFIED Requirements
 
-## Purpose
-Define usage event logging semantics so generation/edit/LLM events are consistently recorded with queryable cost metadata.
-## Requirements
 ### Requirement: UsageLog event recording
 The system SHALL record every image generation, edit, LLM turn, and vectorize export to `UsageLog`, populating cost, token, and byte fields at insert time using `lib/pricing.ts` and the inputs available at the call site.
 
@@ -44,6 +41,8 @@ UsageLog schema MUST include these additional columns:
 - **WHEN** a row was written before migration and backfill has not run
 - **THEN** its cost fields remain NULL and it is still queryable by existing queries that don't depend on cost fields
 
+## ADDED Requirements
+
 ### Requirement: Recraft per-call telemetry
 The system SHALL write one `RecraftRequestLog` row per Recraft API attempt (including retries) with fields: `userId`, `projectId`, `logoId?`, `versionId?`, `model` (constant `"vectorize"`), `status` (`"ok" | "retry" | "error"`), `httpCode?`, `attempt`, `latencyMs`, `errorMessage?`, `createdAt`. Indexes: `[createdAt]`, `[status, createdAt]`.
 
@@ -58,4 +57,3 @@ The system SHALL write one `RecraftRequestLog` row per Recraft API attempt (incl
 #### Scenario: Error without retry
 - **WHEN** Recraft returns 400 on attempt 1
 - **THEN** one row with `status="error"`, `httpCode=400`, `attempt=1`, `errorMessage` populated is written
-
