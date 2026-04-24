@@ -3,10 +3,10 @@ import { TRPCError } from "@trpc/server"
 import { router, protectedProcedure } from "@/lib/trpc/server"
 
 const TIER_LIMITS = {
-  free: { maxProjects: 3, dailyGenerations: 10, premiumExport: false },
-  pro: { maxProjects: -1, dailyGenerations: 100, premiumExport: true },
-  demo: { maxProjects: -1, dailyGenerations: -1, premiumExport: true },
-  enterprise: { maxProjects: -1, dailyGenerations: -1, premiumExport: true },
+  free: { maxProjects: 3, dailyGenerations: 10, monthlyVectorizes: 5, premiumExport: false },
+  pro: { maxProjects: -1, dailyGenerations: 100, monthlyVectorizes: 100, premiumExport: true },
+  demo: { maxProjects: -1, dailyGenerations: -1, monthlyVectorizes: -1, premiumExport: true },
+  enterprise: { maxProjects: -1, dailyGenerations: -1, monthlyVectorizes: -1, premiumExport: true },
 } as const
 
 export const subscriptionRouter = router({

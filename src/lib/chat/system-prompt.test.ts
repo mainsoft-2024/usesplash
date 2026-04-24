@@ -25,12 +25,22 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("- #4 v2 (versionId: ver-3)")
   })
 
-  it("always includes static mention guidance paragraph", () => {
+  it("contains explicit referencedVersions versionId guidance", () => {
     const prompt = buildSystemPrompt()
+    expect(prompt).toContain("referencedVersions 배열에는 반드시 data-mention part의 versionId 값을 사용한다")
+    expect(prompt).toContain("logoId를 넣으면 서버가 폴백하지만")
+  })
 
-    expect(prompt).toContain("data-mention이 포함되면")
-    expect(prompt).toContain("edit_logo.referencedVersions")
-    expect(prompt).toContain('outputMode는 "new_version"')
-    expect(prompt).toContain('outputMode는 "new_logo"')
+  it("contains compositional-intent generate_batch preference guidance", () => {
+    const prompt = buildSystemPrompt()
+    expect(prompt).toContain("compositional 의도")
+    expect(prompt).toContain("generate_batch({ count: 1")
+    expect(prompt).toContain("edit_logo(outputMode: \"new_logo\")보다")
+  })
+
+  it("contains auto-reference awareness guidance", () => {
+    const prompt = buildSystemPrompt()
+    expect(prompt).toContain("최근 두 개 user 턴")
+    expect(prompt).toContain("referenceImageUrls로 다시 넘길 필요가 없고")
   })
 })

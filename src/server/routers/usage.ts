@@ -16,8 +16,11 @@ export const usageRouter = router({
     const todayMidnightUTC = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
     )
+    const startOfMonthUTC = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+    )
 
-    const [lifetimeAgg, todayAgg, vectorizeLifetime, vectorizeToday, subscription] = await Promise.all([
+    const [lifetimeAgg, todayAgg, vectorizeLifetime, vectorizeToday, vectorizeMonthly, subscription] = await Promise.all([
       ctx.prisma.usageLog.aggregate({
         where: { userId },
         _sum: { count: true },
@@ -40,6 +43,13 @@ export const usageRouter = router({
           userId,
           type: "vectorize",
           createdAt: { gte: todayMidnightUTC },
+        },
+      }),
+      ctx.prisma.usageLog.count({
+        where: {
+          userId,
+          type: "vectorize",
+          createdAt: { gte: startOfMonthUTC },
         },
       }),
       ctx.prisma.subscription.findUnique({
@@ -50,6 +60,8 @@ export const usageRouter = router({
 
     const tier = (subscription?.tier as keyof typeof TIER_LIMITS) ?? "free"
     const dailyLimit = TIER_LIMITS[tier]?.dailyGenerations ?? TIER_LIMITS.free.dailyGenerations
+    const vectorizeLimit = TIER_LIMITS[tier]?.monthlyVectorizes ?? TIER_LIMITS.free.monthlyVectorizes
+    const vectorizeRemaining = vectorizeLimit === -1 ? -1 : Math.max(vectorizeLimit - vectorizeMonthly, 0)
     const total = lifetimeAgg._sum.count ?? 0
     const today = todayAgg._sum.count ?? 0
     const remaining = dailyLimit === -1 ? -1 : Math.max(dailyLimit - today, 0)
@@ -62,6 +74,9 @@ export const usageRouter = router({
       dailyLimit,
       vectorizeToday,
       vectorizeLifetime,
+      vectorizeMonthly,
+      vectorizeLimit,
+      vectorizeRemaining,
     }
   }),
 

@@ -158,8 +158,9 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
       const result = await svgMut.mutateAsync({ logoVersionId: version.id })
       await handleDownload(result.url, filename)
       await Promise.all([utils.project.invalidate(), utils.logo.invalidate()])
-    } catch {
-      toast.error("SVG 변환에 실패했습니다. 잠시 후 다시 시도해 주세요.")
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : "SVG 변환에 실패했습니다. 잠시 후 다시 시도해 주세요."
+      toast.error(message)
     }
   }
 

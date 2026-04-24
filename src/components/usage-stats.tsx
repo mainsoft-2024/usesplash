@@ -221,7 +221,16 @@ export function UsageStats() {
     )
   }
 
-  const { total, today, tier, vectorizeToday = 0, vectorizeLifetime = 0 } = usageQuery.data
+  const {
+    total,
+    today,
+    tier,
+    vectorizeToday = 0,
+    vectorizeLifetime = 0,
+    vectorizeMonthly = 0,
+    vectorizeLimit = 5,
+    vectorizeRemaining = 0,
+  } = usageQuery.data
   const ringRadius = 48
   const ringCircumference = 2 * Math.PI * ringRadius
   const ringOffset = ringCircumference - (animatedPercent / 100) * ringCircumference
@@ -272,8 +281,17 @@ export function UsageStats() {
 
         <div className="flex flex-col justify-center gap-2">
           <p className="text-sm text-[#a1a1a1]">SVG 내보내기</p>
-          <p className="text-4xl font-bold text-white">{vectorizeLifetime.toLocaleString()}</p>
-          <p className="text-sm text-[#6b6b6b]">{vectorizeToday.toLocaleString()} 오늘 / {vectorizeLifetime.toLocaleString()} 누적</p>
+          <p className="text-4xl font-bold text-white">
+            {vectorizeMonthly.toLocaleString()}
+            <span className="text-xl text-[#6b6b6b]">
+              {" / "}{vectorizeLimit === -1 ? "∞" : vectorizeLimit.toLocaleString()}
+            </span>
+          </p>
+          <p className="text-sm text-[#6b6b6b]">
+            {vectorizeLimit === -1
+              ? `이번 달 ${vectorizeMonthly.toLocaleString()}회 사용 · 누적 ${vectorizeLifetime.toLocaleString()}회`
+              : `이번 달 ${vectorizeRemaining.toLocaleString()}회 남음 · 누적 ${vectorizeLifetime.toLocaleString()}회`}
+          </p>
         </div>
 
         <div className="flex flex-col gap-3">

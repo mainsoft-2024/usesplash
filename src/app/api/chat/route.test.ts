@@ -5,6 +5,7 @@ const mockAuth = vi.fn()
 const mockStreamText = vi.fn()
 const mockGenerateLogoImage = vi.fn()
 const mockUploadImage = vi.fn()
+const mockRunEditLogo = vi.fn()
 
 const mockBuildSystemPrompt = vi.fn(() => "system")
 const mockValidateMentions = vi.fn()
@@ -34,6 +35,7 @@ vi.mock("@/lib/gemini", () => ({
   editLogoImage: vi.fn(),
   withGeminiConcurrency: async (fn: () => Promise<unknown>) => fn(),
 }))
+vi.mock("./edit-logo", () => ({ runEditLogo: mockRunEditLogo }))
 vi.mock("@/lib/storage", async () => {
   const actual = await vi.importActual<typeof import("@/lib/storage")>("@/lib/storage")
   return {
@@ -57,6 +59,7 @@ vi.mock("./mentions", () => ({
   extractMentionParts: mockExtractMentionParts,
   validateMentions: mockValidateMentions,
   renderMentionedVersionsForPrompt: mockRenderMentionedVersionsForPrompt,
+  fetchImageBufferFromUrl: vi.fn(),
 }))
 vi.mock("ai", async () => {
   const actual = await vi.importActual<typeof import("ai")>("ai")
@@ -93,11 +96,20 @@ describe("chat route cost logging", () => {
       })
     )
     mockUploadImage.mockResolvedValue({ url: "https://blob/logo.webp", bytes: 2048 })
-  })
     mockBuildSystemPrompt.mockReturnValue("system")
     mockValidateMentions.mockResolvedValue([])
     mockExtractMentionParts.mockReturnValue([])
     mockRenderMentionedVersionsForPrompt.mockReturnValue("")
+    mockRunEditLogo.mockResolvedValue({
+      logoId: "logo-1",
+      logoIndex: 1,
+      versionId: "v-2",
+      versionNumber: 2,
+      imageUrl: "https://blob/out.png",
+      editedFrom: 1,
+      blobBytes: 100,
+    })
+  })
 
   it("records generate usage cost fields", async () => {
     mockGenerateLogoImage.mockResolvedValue({ imageBuffer: Buffer.from("img"), mimeType: "image/webp" })
@@ -185,9 +197,7 @@ describe("chat route cost logging", () => {
 
     expect(prismaMock.geminiRequestLog.create).toHaveBeenCalledTimes(1)
     expect(
-      prismaMock.usageLog.create.mock.calls.some((call) =>
-        call[0]?.data?.type === "generate" || call[0]?.data?.type === "llm"
-      )
+      prismaMock.usageLog.create.mock.calls.some((call) => call[0]?.data?.type === "generate" || call[0]?.data?.type === "llm")
     ).toBe(true)
   })
 })
@@ -215,6 +225,15 @@ describe("mention validation", () => {
       ] as any
     )
     mockRenderMentionedVersionsForPrompt.mockReturnValue("## User-mentioned logo versions")
+    mockRunEditLogo.mockResolvedValue({
+      logoId: "logo-1",
+      logoIndex: 1,
+      versionId: "v-2",
+      versionNumber: 2,
+      imageUrl: "https://blob/out.png",
+      editedFrom: 1,
+      blobBytes: 100,
+    })
   })
 
   it("returns 400 mention_invalid and does not call LLM on invalid mention", async () => {
@@ -258,16 +277,8 @@ describe("mention validation", () => {
 
   it("passes mention file parts to LLM and includes mention prompt section", async () => {
     mockValidateMentions.mockResolvedValue([
-      {
-        id: "v1",
-        imageUrl: "https://blob/mentioned1.png",
-        logo: { orderIndex: 0, prompt: "a" },
-      },
-      {
-        id: "v2",
-        imageUrl: "https://blob/mentioned2.png",
-        logo: { orderIndex: 1, prompt: "b" },
-      },
+      { id: "v1", imageUrl: "https://blob/mentioned1.png", logo: { orderIndex: 0, prompt: "a" } },
+      { id: "v2", imageUrl: "https://blob/mentioned2.png", logo: { orderIndex: 1, prompt: "b" } },
     ])
     mockStreamText.mockImplementation((config: any) => ({
       toUIMessageStreamResponse: async () => new Response("ok"),
@@ -290,6 +301,72 @@ describe("mention validation", () => {
     expect(streamConfig.messages[0].parts.map((p: any) => p.url)).toContain("https://blob/mentioned2.png")
     expect(mockBuildSystemPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ mentionedSection: "## User-mentioned logo versions" })
+    )
+  })
+
+  it("auto-collects last 2 user-turn file URLs and passes merged refs to runEditLogo", async () => {
+    mockValidateMentions.mockResolvedValue([
+      { id: "v1", imageUrl: "https://blob/mentioned.png", logo: { orderIndex: 0, prompt: "a" } },
+    ])
+    mockStreamText.mockImplementation((config: any) => ({
+      toUIMessageStreamResponse: async () => new Response("ok"),
+    }))
+
+    const { POST } = await import("./route")
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        projectId: "project-1",
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "old" }, { type: "file", url: "https://blob/old.png" }] },
+          { role: "assistant", parts: [{ type: "text", text: "ok" }] },
+          { role: "user", parts: [{ type: "text", text: "new" }, { type: "file", url: "https://blob/new.png" }] },
+        ],
+      }),
+    })
+    await POST(req)
+
+    const streamConfig = mockStreamText.mock.calls[0]?.[0]
+    await streamConfig.tools.edit_logo.execute({ editPrompt: "tweak", referencedVersions: ["v1"] })
+
+    expect(mockRunEditLogo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        referenceImageUrls: ["https://blob/new.png", "https://blob/mentioned.png", "https://blob/old.png"],
+      }),
+      expect.any(Object)
+    )
+  })
+
+  it("accepts edit_logo.referenceImageUrls input without 500", async () => {
+    mockValidateMentions.mockResolvedValue([])
+    mockExtractMentionParts.mockReturnValue([])
+    mockStreamText.mockImplementation((config: any) => ({
+      toUIMessageStreamResponse: async () => new Response("ok"),
+    }))
+
+    const { POST } = await import("./route")
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        projectId: "project-1",
+        messages: [{ role: "user", parts: [{ type: "text", text: "edit" }] }],
+      }),
+    })
+    await POST(req)
+
+    const streamConfig = mockStreamText.mock.calls[0]?.[0]
+    await expect(
+      streamConfig.tools.edit_logo.execute({
+        editPrompt: "tweak",
+        referencedVersions: ["v1"],
+        referenceImageUrls: ["https://blob/custom.png"],
+      })
+    ).resolves.toBeTruthy()
+    expect(mockRunEditLogo).toHaveBeenCalledWith(
+      expect.objectContaining({ referenceImageUrls: expect.arrayContaining(["https://blob/custom.png"]) }),
+      expect.any(Object)
     )
   })
 })

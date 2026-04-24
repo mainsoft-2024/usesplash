@@ -4,6 +4,7 @@ import { z } from "zod"
 import { RECRAFT_VECTORIZE_USD, blobCost } from "@/lib/pricing"
 import { uploadImage, getDownloadUrl, getStorageKey } from "@/lib/storage"
 import { router, protectedProcedure } from "@/lib/trpc/server"
+import { TIER_LIMITS } from "./subscription"
 
 export const exportRouter = router({
   crop: protectedProcedure
@@ -118,6 +119,31 @@ export const exportRouter = router({
           url: version.svgUrl,
           key: version.s3Key.replace(/\.png$/, ".svg"),
           cached: true,
+        }
+      }
+
+      // Monthly vectorize limit enforcement
+      const subscription = await ctx.prisma.subscription.findUnique({
+        where: { userId: ctx.session.user.id },
+        select: { tier: true },
+      })
+      const tier = (subscription?.tier as keyof typeof TIER_LIMITS) ?? "free"
+      const monthlyLimit = TIER_LIMITS[tier]?.monthlyVectorizes ?? TIER_LIMITS.free.monthlyVectorizes
+      if (monthlyLimit !== -1) {
+        const now = new Date()
+        const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+        const monthlyCount = await ctx.prisma.usageLog.count({
+          where: {
+            userId: ctx.session.user.id,
+            type: "vectorize",
+            createdAt: { gte: startOfMonth },
+          },
+        })
+        if (monthlyCount >= monthlyLimit) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: `이번 달 SVG 내보내기 한도(${monthlyLimit}회)를 초과했습니다. 다음 달에 다시 시도하거나 플랜을 업그레이드해 주세요.`,
+          })
         }
       }
 

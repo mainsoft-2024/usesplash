@@ -138,6 +138,20 @@ export async function POST(req: Request) {
     }
   }
 
+  const autoReferenceUrls: string[] = []
+  let recentUserTurns = 0
+  for (let i = messages.length - 1; i >= 0 && recentUserTurns < 2; i--) {
+    const message = messages[i]
+    if (message.role !== "user") continue
+    recentUserTurns += 1
+    for (const part of message.parts ?? []) {
+      if (part.type !== "file") continue
+      const fileUrl = (part as { url?: string }).url
+      if (typeof fileUrl !== "string" || !fileUrl.startsWith("https://")) continue
+      if (!autoReferenceUrls.includes(fileUrl)) autoReferenceUrls.push(fileUrl)
+    }
+  }
+
   const systemPrompt = buildSystemPrompt({
     projectName: project.name,
     logoCount: project._count.logos,
@@ -387,18 +401,25 @@ export async function POST(req: Request) {
       }),
 
       edit_logo: tool({
-        description: "Edit an existing logo image. Use referencedVersions for mention IDs and outputMode to choose between editing current logo or creating a new logo.",
+        description: "Edit an existing logo image. Pass the versionId (NOT logoId) from data-mention parts in referencedVersions. The server will auto-include images from the user's last two message turns as additional references.",
         inputSchema: z.object({
           logoOrderIndex: z.number().optional().describe("The logo number (1-based display index) to edit"),
           versionNumber: z.number().optional().describe("Specific version number to edit from. If omitted, uses latest version."),
           editPrompt: z.string().describe("Description of the edit to apply"),
           referencedVersions: z.array(z.string()).max(3).optional().describe("Mentioned logoVersion IDs to use as references"),
+          referenceImageUrls: z
+            .array(z.string().url())
+            .max(3)
+            .optional()
+            .describe(
+              "Absolute https URLs of reference images to send to the image model in addition to referencedVersions. The server will automatically merge the latest 2 user-turn file images; only pass extra URLs here if the user explicitly pointed to a different image."
+            ),
           outputMode: z
             .enum(["new_version", "new_logo"])
             .optional()
             .describe("new_version edits an existing logo, new_logo creates a new logo entry"),
         }),
-        execute: async ({ logoOrderIndex, versionNumber, editPrompt, referencedVersions, outputMode }) => {
+        execute: async ({ logoOrderIndex, versionNumber, editPrompt, referencedVersions, referenceImageUrls, outputMode }) => {
           // Re-check limit before edit
           let sub = await prisma.subscription.findUnique({
             where: { userId },
@@ -419,6 +440,18 @@ export async function POST(req: Request) {
             }
           }
 
+          const mergedReferenceUrls: string[] = []
+          for (const imageUrl of referenceImageUrls ?? []) {
+            if (!mergedReferenceUrls.includes(imageUrl)) mergedReferenceUrls.push(imageUrl)
+          }
+          for (const imageUrl of autoReferenceUrls) {
+            if (!mergedReferenceUrls.includes(imageUrl)) mergedReferenceUrls.push(imageUrl)
+          }
+          const cappedReferenceUrls = mergedReferenceUrls.slice(0, 3)
+          for (const imageUrl of cappedReferenceUrls) {
+            allowedReferenceUrls.add(imageUrl)
+          }
+
           const result = await runEditLogo(
             {
               logoOrderIndex,
@@ -426,6 +459,7 @@ export async function POST(req: Request) {
               editPrompt,
               referencedVersions,
               outputMode,
+              referenceImageUrls: cappedReferenceUrls,
             },
             {
               prisma,

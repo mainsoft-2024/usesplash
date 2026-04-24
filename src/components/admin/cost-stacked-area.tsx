@@ -15,12 +15,14 @@ type CostBreakdownPoint = {
   gemini_image: number
   openrouter_llm: number
   vercel_blob: number
+  recraft_vectorize: number
 }
 
 const chartColors = {
   gemini_image: "#10b981",
   openrouter_llm: "#8b5cf6",
   vercel_blob: "#3b82f6",
+  recraft_vectorize: "#ec4899",
 } as const
 
 const RechartsCostStackedArea = dynamic(
@@ -48,6 +50,10 @@ const RechartsCostStackedArea = dynamic(
                 <stop offset="5%" stopColor={chartColors.vercel_blob} stopOpacity={0.3} />
                 <stop offset="95%" stopColor={chartColors.vercel_blob} stopOpacity={0} />
               </linearGradient>
+              <linearGradient id="recraft-vectorize-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={chartColors.recraft_vectorize} stopOpacity={0.35} />
+                <stop offset="95%" stopColor={chartColors.recraft_vectorize} stopOpacity={0} />
+              </linearGradient>
             </defs>
             <CartesianGrid stroke="#2a2a2a" strokeDasharray="3 3" />
             <XAxis dataKey="date" tick={{ fill: "#a1a1a1", fontSize: 12 }} tickLine={false} axisLine={false} />
@@ -70,6 +76,7 @@ const RechartsCostStackedArea = dynamic(
                   gemini_image: "Gemini Image",
                   openrouter_llm: "OpenRouter LLM",
                   vercel_blob: "Vercel Blob",
+                  recraft_vectorize: "Recraft Vectorize",
                 }
                 return [`$${Number(value ?? 0).toFixed(4)}`, labelByKey[String(name)] ?? String(name)]
               }}
@@ -77,6 +84,7 @@ const RechartsCostStackedArea = dynamic(
             <Area type="monotone" dataKey="gemini_image" stackId="cost" stroke={chartColors.gemini_image} fill="url(#gemini-image-fill)" />
             <Area type="monotone" dataKey="openrouter_llm" stackId="cost" stroke={chartColors.openrouter_llm} fill="url(#openrouter-llm-fill)" />
             <Area type="monotone" dataKey="vercel_blob" stackId="cost" stroke={chartColors.vercel_blob} fill="url(#vercel-blob-fill)" />
+            <Area type="monotone" dataKey="recraft_vectorize" stackId="cost" stroke={chartColors.recraft_vectorize} fill="url(#recraft-vectorize-fill)" />
           </AreaChart>
         </ResponsiveContainer>
       )
@@ -92,7 +100,7 @@ export function CostStackedArea({ period }: CostStackedAreaProps) {
   const { data, isLoading, error } = trpc.adminInsights.getCostBreakdown.useQuery({ period })
 
   const hasData = useMemo(
-    () => !!data && data.some((row: CostBreakdownPoint) => row.gemini_image > 0 || row.openrouter_llm > 0 || row.vercel_blob > 0),
+    () => !!data && data.some((row: CostBreakdownPoint) => row.gemini_image > 0 || row.openrouter_llm > 0 || row.vercel_blob > 0 || (row.recraft_vectorize ?? 0) > 0),
     [data],
   )
 

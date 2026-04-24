@@ -154,10 +154,11 @@ export default function AdminUserDetailPage(props: PageProps) {
               ))}
             </div>
           ) : userCostRevenue ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <KpiCard label="월 구독가" value={formatUsd(userCostRevenue.monthlyPriceUsd)} />
               <KpiCard label="LTV" value={formatUsd(userCostRevenue.ltvUsd)} />
               <KpiCard label="총 비용" value={formatUsd(userCostRevenue.totalCostUsd)} />
+              <KpiCard label="SVG 내보내기 비용" value={formatUsd(userCostRevenue.vectorizeCostUsd ?? 0)} />
               <KpiCard
                 label="마진"
                 value={formatUsd(userCostRevenue.marginUsd)}

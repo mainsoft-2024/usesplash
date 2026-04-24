@@ -342,9 +342,19 @@ export function ChatPanel({ chat, projectId, logos = [] }: ChatProps) {
         )
       }
       if (state === "output-available") {
+        const hasError =
+          typeof output?.error === "string" || output?.logoIndex == null || output?.versionNumber == null
+        if (hasError) {
+          return (
+            <div key={key} className="mt-4 border-l-2 border-red-500/60 py-1 pl-3">
+              <div className="text-xs font-medium text-red-300">편집 실패</div>
+              <div className="mt-0.5 text-[11px] text-red-300/80">{String(output?.error ?? "알 수 없는 오류")}</div>
+            </div>
+          )
+        }
         return (
           <div key={key} className="mt-4 border-l-2 border-[var(--accent-green)]/70 py-1 pl-3 text-xs font-medium text-[var(--accent-green-light)]">
-            로고 #{String(output?.logoIndex)} v{String(output?.versionNumber)} 편집 완료
+            로고 #{String(output.logoIndex)} v{String(output.versionNumber)} 편집 완료
           </div>
         )
       }
