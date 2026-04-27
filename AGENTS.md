@@ -155,6 +155,12 @@ npx vercel --prod               # Deploy to production
 - Gallery version cards expose a hover `@ 인용` button that pushes a chip into the active project's composer; disabled when the composer's `activeProjectId` differs
 - `edit_logo` tool gained `referencedVersions: string[] (≤3)` + `outputMode: "new_version" | "new_logo"`; server appends validated mention `imageUrl`s as `file` parts on the user message so the LLM sees the actual images
 
+### Attachment constants (shared)
+- File: `src/lib/attachment-constants.ts`
+- Constants: `MAX_FILE_SIZE` (4MB), `ACCEPTED_TYPES` (PNG/JPEG/WebP), `ACCEPTED_EXTENSIONS`, `MAX_FILES_PER_BATCH` (10)
+- Used by both `chat-panel.tsx` (attachment picker) and `gallery-panel.tsx` (upload flow)
+- Server-side validation in `storage.ts#validateAndResizeUpload` enforces the same allowlist via magic-byte sniffing with `file-type`
+
 ## Known Issues / Gotchas
 
 1. **Korean IME**: `onKeyDown` must check `e.nativeEvent.isComposing` to avoid double-submit
@@ -163,3 +169,4 @@ npx vercel --prod               # Deploy to production
 4. **System prompt backticks**: The system prompt is a JS template literal — do NOT use backticks inside it
 5. **`maxDuration`**: Set to 300s in chat route for 5-image batch generation with retries
 6. **`stepCountIs(3)`**: Limits LLM to 3 reasoning steps (tool call → result → response)
+7. **HEIC/HEIF unsupported**: sharp on Vercel serverless runtime lacks libheif. Both chat attachments and gallery uploads reject HEIC/HEIF client-side (file picker `accept`) and server-side (file-type magic-byte sniff) with toast 'PNG, JPEG, WebP 형식만 지원해요. (아이폰 사진은 변환이 필요합니다)'

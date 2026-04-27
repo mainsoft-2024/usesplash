@@ -1,8 +1,5 @@
-# attachment-storage Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change multimodal-image-vision. Update Purpose after archive.
-## Requirements
 ### Requirement: Server-side image resize
 
 The system SHALL resize uploaded and attached images on the server using `sharp` to a maximum of 512px on the longest edge, preserving aspect ratio, and output as WebP format (quality 85). This optimized image SHALL be used for both LLM vision and storage.
@@ -26,28 +23,7 @@ Resize calls SHALL be performed with `sharp` configured to enforce `limitInputPi
 - **THEN** sharp throws before decoding
 - **AND** the server returns a BAD_REQUEST error with a user-facing Korean message
 
-### Requirement: Blob upload for attachments
-The system SHALL upload resized attachment images to Vercel Blob and store the resulting URL in the message's file parts. The DB SHALL store Blob URLs instead of base64 data URLs.
-
-#### Scenario: Attachment upload flow
-- **WHEN** user sends a message with an attached image
-- **THEN** the server receives the base64 data URL
-- **AND** resizes the image with sharp (512px max, WebP)
-- **AND** uploads to Vercel Blob
-- **AND** stores the Blob URL in ChatMessage.parts as `{ type: "file", mediaType: "image/webp", url: "https://...blob.vercel-storage.com/..." }`
-
-### Requirement: Backward compatibility with base64 parts
-The system SHALL handle both legacy base64 data URL file parts and new Blob URL file parts when parsing stored messages.
-
-#### Scenario: Loading old messages with base64 parts
-- **WHEN** the system loads a ChatMessage with base64 data URL file parts
-- **THEN** the images display correctly in the UI
-- **AND** the LLM receives them as `image_url` content (data URL format)
-
-#### Scenario: Loading new messages with Blob URL parts
-- **WHEN** the system loads a ChatMessage with Blob URL file parts
-- **THEN** the images display correctly in the UI
-- **AND** the LLM receives them as `image_url` content (Blob URL format)
+## ADDED Requirements
 
 ### Requirement: Shared upload constants
 
@@ -102,4 +78,3 @@ Rejection at any stage SHALL surface a user-facing Korean error message specific
 - **THEN** sharp throws during metadata decode
 - **AND** the server returns BAD_REQUEST with "이미지를 읽을 수 없어요. 파일이 손상되었을 수 있어요."
 - **AND** no Blob upload or DB row is created
-
