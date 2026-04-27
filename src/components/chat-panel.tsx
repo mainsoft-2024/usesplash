@@ -10,6 +10,8 @@ import { ChatMarkdown } from "@/components/chat-markdown"
 import { MentionChip } from "@/components/chat/mention-chip"
 import { LogoMentionPicker } from "@/components/chat/logo-mention-picker"
 import { useGallerySpotlightStore } from "@/lib/chat/gallery-spotlight-store"
+import { toast } from "sonner"
+import { MAX_FILE_SIZE, ACCEPTED_TYPES } from "@/lib/attachment-constants"
 
 type ChatProps = {
   chat: ReturnType<typeof useProjectChat>
@@ -119,8 +121,6 @@ export function ChatPanel({ chat, projectId, logos = [] }: ChatProps) {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const previewUrlMapRef = useRef(new Map<File, string>())
-  const MAX_FILE_SIZE = 4 * 1024 * 1024
-  const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/heic", "image/heif"]
 
   useEffect(() => {
     if (!projectId) return
@@ -193,12 +193,12 @@ export function ChatPanel({ chat, projectId, logos = [] }: ChatProps) {
 
     const validFiles: File[] = []
     files.forEach((file) => {
-      if (!file.type.startsWith("image/")) {
-        alert("이미지 파일만 첨부할 수 있어요.")
+      if (!ACCEPTED_TYPES.includes(file.type as (typeof ACCEPTED_TYPES)[number])) {
+        toast.error("PNG, JPEG, WebP 형식만 지원해요.")
         return
       }
       if (file.size > MAX_FILE_SIZE) {
-        alert("이미지당 최대 4MB까지 첨부할 수 있어요.")
+        toast.error("이미지당 최대 4MB까지 첨부할 수 있어요.")
         return
       }
       validFiles.push(file)
@@ -208,7 +208,7 @@ export function ChatPanel({ chat, projectId, logos = [] }: ChatProps) {
       setAttachedFiles((prev) => [...prev, ...validFiles])
     }
     event.target.value = ""
-  }, [ACCEPTED_TYPES, MAX_FILE_SIZE])
+  }, [])
 
   const handleMentionSelect = useCallback(
     (selected: LogoMentionData) => {
@@ -515,7 +515,7 @@ export function ChatPanel({ chat, projectId, logos = [] }: ChatProps) {
       <input
         type="file"
         ref={fileInputRef}
-        accept="image/*"
+        accept={ACCEPTED_TYPES.join(",")}
         multiple
         onChange={handleFileSelect}
         className="absolute w-0 h-0 overflow-hidden opacity-0"
