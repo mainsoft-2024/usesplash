@@ -1,12 +1,15 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
+import { CropModal } from "@/components/crop-modal"
 import { trpc } from "@/lib/trpc/client"
 import { PulseSpinner } from "@/components/spinners"
 import { toast } from "sonner"
 import { useComposerStore } from "@/lib/chat/composer-store"
 import { useGallerySpotlightStore } from "@/lib/chat/gallery-spotlight-store"
 
+import { MAX_FILE_SIZE, ACCEPTED_TYPES, MAX_FILES_PER_BATCH } from "@/lib/attachment-constants"
+import { parseMetadata } from "@/lib/logo-version-metadata"
 type LogoVersion = {
   id: string
   versionNumber: number
@@ -16,6 +19,7 @@ type LogoVersion = {
   editPrompt: string | null
   s3Key: string
   createdAt: Date | string
+  metadata?: unknown
 }
 
 type Logo = {
@@ -43,12 +47,71 @@ type GalleryProps = {
 export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActivity }: GalleryProps) {
   const [activeIdx, setActiveIdx] = useState<Record<string, number>>({})
   const [modalIdx, setModalIdx] = useState<number | null>(null)
+  const [cropModalOpen, setCropModalOpen] = useState(false)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const composerProjectId = useComposerStore((state) => state.activeProjectId)
 
-  const cropMut = trpc.export.crop.useMutation()
   const svgMut = trpc.export.vectorize.useMutation()
   const utils = trpc.useUtils()
+  const [pendingUploads, setPendingUploads] = useState<Array<{ localId: string; status: "uploading" | "error" }>>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragCounterRef = useRef(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const uploadMutation = trpc.logo.uploadBaseImage.useMutation()
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    if (!projectId) return
+    const valid: File[] = []
+    for (const file of files) {
+      if (!ACCEPTED_TYPES.includes(file.type as (typeof ACCEPTED_TYPES)[number])) {
+        toast.error(`${file.name}: PNG, JPEG, WebP 형식만 지원해요.`)
+        continue
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name}: 이미지당 최대 4MB까지 업로드할 수 있어요.`)
+        continue
+      }
+      valid.push(file)
+    }
+    let batch = valid
+    if (batch.length > MAX_FILES_PER_BATCH) {
+      toast.warning("한 번에 최대 10개까지 업로드할 수 있어요. 처음 10개만 업로드해요.")
+      batch = batch.slice(0, MAX_FILES_PER_BATCH)
+    }
+    if (!batch.length) return
+    let succeeded = 0
+    for (const file of batch) {
+      const localId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      setPendingUploads((prev) => [...prev, { localId, status: "uploading" }])
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = () => reject(reader.error ?? new Error("read failed"))
+          reader.readAsDataURL(file)
+        })
+        await uploadMutation.mutateAsync({ projectId, mimeType: file.type, dataUrl })
+        setPendingUploads((prev) => prev.filter((p) => p.localId !== localId))
+        succeeded++
+        await utils.logo.listByProject.invalidate({ projectId })
+        await utils.project.invalidate()
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "업로드에 실패했어요."
+        toast.error(`${file.name}: ${message}`)
+        setPendingUploads((prev) => prev.map((p) => p.localId === localId ? { ...p, status: "error" } : p))
+        setTimeout(() => {
+          setPendingUploads((prev) => prev.filter((p) => p.localId !== localId))
+        }, 3000)
+      }
+    }
+    if (batch.length > 1) {
+      if (succeeded === batch.length) {
+        toast.success(`${succeeded}/${batch.length}개 업로드 완료`)
+      } else {
+        toast.error(`${batch.length}개 중 ${succeeded}개 업로드됐어요.`)
+      }
+    }
+  }, [projectId, uploadMutation, utils])
   const getVer = useCallback((logo: Logo) => logo.versions[activeIdx[logo.id] ?? 0] ?? logo.versions[0], [activeIdx])
 
   const cycle = useCallback((logoId: string, dir: 1 | -1, total: number) => {
@@ -60,6 +123,10 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
   useEffect(() => {
     if (modalIdx === null) return
     const h = (e: KeyboardEvent) => {
+      if (cropModalOpen) {
+        if (e.key === "Escape") setCropModalOpen(false)
+        return
+      }
       if (e.key === "Escape") setModalIdx(null)
       if (e.key === "ArrowLeft") setModalIdx((p) => p !== null ? (p - 1 + logos.length) % logos.length : null)
       if (e.key === "ArrowRight") setModalIdx((p) => p !== null ? (p + 1) % logos.length : null)
@@ -71,7 +138,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
     }
     window.addEventListener("keydown", h)
     return () => window.removeEventListener("keydown", h)
-  }, [modalIdx, logos, cycle, getVer])
+  }, [modalIdx, logos, cycle, getVer, cropModalOpen])
 
   useEffect(() => {
     const highlighted = new Map<HTMLElement, number>()
@@ -116,18 +183,10 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
       ))}
     </div>
   </div>
-  if (!logos.length) return <div className="h-full flex items-center justify-center px-6">
-    <div className="relative w-full max-w-md rounded-2xl p-[1px]">
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#2a2a2a] via-[#4CAF50]/50 to-[#2a2a2a] opacity-60 blur-sm animate-pulse" />
-      <div className="relative rounded-2xl border border-[#2a2a2a] bg-[#111] px-6 py-10 text-center text-[#555]">
-        <p className="mb-2 text-lg text-[#ddd]">아직 생성된 로고가 없습니다</p>
-        <p className="text-sm">왼쪽 채팅에서 AI와 대화를 시작하세요</p>
-      </div>
-    </div>
-  </div>
 
   const mLogo = modalIdx !== null ? logos[modalIdx] : null
   const mVer = mLogo ? getVer(mLogo) : null
+  const mVerMeta = parseMetadata(mVer?.metadata)
   const modalShowEditProgress =
     Boolean(mLogo && toolActivity?.type === "editing" && mLogo.orderIndex + 1 === toolActivity.logoIndex)
   const revCount = logos.reduce((sum, logo) => sum + Math.max(0, logo.versions.length - 1), 0)
@@ -164,16 +223,62 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
     }
   }
 
+  const handleCropCommitted = useCallback(async (_newVersion: { id: string; versionNumber: number; imageUrl: string }) => {
+    setCropModalOpen(false)
+    await utils.logo.listByProject.invalidate({ projectId })
+    if (modalIdx !== null) {
+      const currentLogo = logos[modalIdx]
+      if (currentLogo) {
+        setActiveIdx((prev) => ({
+          ...prev,
+          [currentLogo.id]: currentLogo.versions.length,
+        }))
+      }
+    }
+  }, [utils, projectId, modalIdx, logos])
+
   return (
-    <div className="h-full flex flex-col bg-[#0e0e0e]">
+    <div
+      className="h-full flex flex-col bg-[#0e0e0e] relative"
+      onDragEnter={(e) => { e.preventDefault(); dragCounterRef.current++; if (dragCounterRef.current === 1) setIsDragging(true) }}
+      onDragLeave={(e) => { e.preventDefault(); dragCounterRef.current = Math.max(0, dragCounterRef.current - 1); if (dragCounterRef.current === 0) setIsDragging(false) }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy" }}
+      onDrop={(e) => { e.preventDefault(); dragCounterRef.current = 0; setIsDragging(false); const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/")); if (files.length) void handleFiles(files) }}
+    >
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
         <span className="text-xs text-[#666]">{logos.length}개 로고{revCount > 0 ? ` · ${revCount}개 수정본` : ""}</span>
-        <button onClick={onRefresh} className="text-[#555] hover:text-white transition-colors" title="새로고침">
-          ↻
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="text-xs text-[#888] hover:text-white transition-colors"
+            data-testid="gallery-upload-button"
+            title="이미지 업로드"
+          >+ 업로드</button>
+          <button onClick={onRefresh} className="text-[#555] hover:text-white transition-colors" title="새로고침">↻</button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
+        {(!logos.length && !pendingUploads.length) ? (
+          <div className="h-full flex items-center justify-center px-6">
+            <div className="relative w-full max-w-md rounded-2xl p-[1px]">
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#2a2a2a] via-[#4CAF50]/50 to-[#2a2a2a] opacity-60 blur-sm animate-pulse" />
+              <div className="relative rounded-2xl border border-[#2a2a2a] bg-[#111] px-6 py-10 text-center text-[#555]">
+                <p className="mb-2 text-lg text-[#ddd]">아직 생성된 로고가 없습니다</p>
+                <p className="text-sm">AI와 대화하거나 가지고 계신 이미지를 업로드하세요</p>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="mt-4 px-4 py-2 rounded-lg border border-[#333] bg-[#1a1a1a] hover:bg-[#222] text-white text-sm"
+                  data-testid="gallery-upload-empty-button"
+                >
+                  이미지 업로드
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
           {(toolActivity?.type === "generated" && toolActivity.generated > 0) && (
             <div className="col-span-full mb-3 px-3 py-2 bg-[#1a2e1a] border border-[#4CAF50]/30 rounded-lg">
@@ -200,6 +305,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
             const hasRevs = logo.versions.length > 1
             const isBeingEdited = toolActivity?.type === "editing" && logo.orderIndex + 1 === toolActivity.logoIndex
             const justEdited = toolActivity?.type === "edited" && logo.orderIndex + 1 === toolActivity.logoIndex
+            const verMeta = parseMetadata(ver.metadata)
             return (
               <div
                 key={logo.id}
@@ -217,6 +323,14 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
                   <span className={`absolute top-2 left-2 px-2.5 py-0.5 rounded-lg text-[10px] font-bold tracking-wide ${isRev ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
                     #{logo.orderIndex + 1}{isRev ? ` · v${ver.versionNumber}` : ""}
                   </span>
+                  {(verMeta?.source === "crop_manual" || verMeta?.source === "crop_auto") && (
+                    <span
+                      className="absolute top-2 left-2 mt-5 px-2 py-0.5 rounded-lg text-[9px] font-bold bg-[rgba(46,125,50,0.85)] text-white"
+                      title={verMeta?.source === "crop_manual" ? "수동 크롭" : "자동 크롭"}
+                    >
+                      ✂️
+                    </span>
+                  )}
 
                   {/* Editing overlay — shimmer + indeterminate bar + activity spinner */}
                   {isBeingEdited && (
@@ -290,8 +404,43 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
               </div>
             )
           })}
+          {pendingUploads.map((p) => (
+            <div
+              key={p.localId}
+              data-testid={`pending-upload-${p.status}`}
+              className={
+                p.status === "uploading"
+                  ? "aspect-square rounded-lg bg-[#1a1a1a] animate-pulse border border-[#333]"
+                  : "aspect-square rounded-lg bg-[#1a1a1a] border border-red-500/60 flex items-center justify-center text-red-400 text-xl"
+              }
+            >{p.status === "error" ? "✕" : null}</div>
+          ))}
         </div>
+        )}
       </div>
+
+      {isDragging && (
+        <div
+          data-testid="gallery-drop-overlay"
+          className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(0,0,0,0.7)] border-2 border-dashed border-[#4CAF50] rounded-lg pointer-events-none"
+        >
+          <p className="text-white text-lg font-medium pointer-events-none">여기에 놓아주세요</p>
+        </div>
+      )}
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept={ACCEPTED_TYPES.join(",")}
+        multiple
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? [])
+          if (files.length) void handleFiles(files)
+          e.target.value = ""
+        }}
+        className="absolute w-0 h-0 overflow-hidden opacity-0"
+        data-testid="gallery-upload-input"
+      />
 
       {favorites.size > 0 && <div className="px-4 py-2.5 border-t border-[#333] bg-[#1a1a1a] text-sm"><span className="text-[#666]">즐겨찾기: </span><span className="text-[#4CAF50] font-medium">{favorites.size}개 선택</span></div>}
 
@@ -308,6 +457,14 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
               <span className={`absolute top-3 left-3 z-20 px-3 py-1 rounded-xl text-xs font-bold ${(activeIdx[mLogo.id] ?? 0) > 0 ? "bg-[rgba(46,125,50,0.85)] text-white" : "bg-[rgba(0,0,0,0.6)] text-[#ccc]"}`}>
                 {(activeIdx[mLogo.id] ?? 0) > 0 ? `REV v${mVer.versionNumber}` : "ORIGINAL"}
               </span>
+              {(mVerMeta?.source === "crop_manual" || mVerMeta?.source === "crop_auto") && (
+                <span
+                  className="absolute top-3 left-3 mt-6 z-20 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[rgba(46,125,50,0.85)] text-white"
+                  title={mVerMeta?.source === "crop_manual" ? "수동 크롭" : "자동 크롭"}
+                >
+                  ✂️ 크롭
+                </span>
+              )}
               {modalShowEditProgress && (
                 <>
                   <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-t from-black/70 via-black/35 to-black/25" aria-hidden />
@@ -339,7 +496,7 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
             </div>
           </div>
 
-          {/* Info area — fixed height at bottom, never affects image position */}
+          {!cropModalOpen && (
           <div className="shrink-0 h-40 flex flex-col items-center justify-start pt-2 pb-4" onClick={(e) => e.stopPropagation()}>
             <div className="text-base font-semibold">#{mLogo.orderIndex + 1}</div>
             <div className="h-5 flex items-center">
@@ -359,13 +516,19 @@ export function GalleryPanel({ logos, isLoading, onRefresh, projectId, toolActiv
               >
                 PNG 다운로드
               </button>
-              <button onClick={() => cropMut.mutate({ logoVersionId: mVer.id })} disabled={cropMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{cropMut.isPending ? "크롭 중..." : "크롭"}</button>
+              <button onClick={() => setCropModalOpen(true)} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50]">크롭</button>
               <span title="출시 예정" className="px-3 py-1.5 text-xs bg-[#1a1a1a] border border-dashed border-[#333] rounded-lg text-[#777] cursor-not-allowed select-none">배경제거 <span className="ml-1 text-[10px] text-[#4CAF50]/70">예정</span></span>
               <button onClick={() => handleSvgClick(mVer)} disabled={svgMut.isPending} className="px-3 py-1.5 text-xs bg-[#1e1e1e] border border-[#333] rounded-lg hover:border-[#4CAF50] disabled:opacity-50">{svgMut.isPending ? <><PulseSpinner size={12} color="#4CAF50" /> SVG 변환 중...</> : "SVG 다운로드"}</button>
             </div>
-            {cropMut.data && <a href={cropMut.data.url} target="_blank" className="block text-xs text-[#4CAF50] mt-1 underline">크롭 결과 다운로드</a>}
             <div className="text-[#555] text-[11px] mt-2">← → 로고 · ↑ ↓ 버전 · F 즐겨찾기 · Esc 닫기</div>
-          </div>
+          </div>)}
+          {cropModalOpen && modalIdx !== null && mVer && (
+            <CropModal
+              sourceVersion={{ id: mVer.id, imageUrl: mVer.imageUrl }}
+              onClose={() => setCropModalOpen(false)}
+              onCommitted={handleCropCommitted}
+            />
+          )}
         </div>
       )}
     </div>

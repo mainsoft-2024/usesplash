@@ -3,24 +3,62 @@ import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { RECRAFT_VECTORIZE_USD, blobCost } from "@/lib/pricing"
 import { uploadImage, getDownloadUrl, getStorageKey } from "@/lib/storage"
+import { Prisma, PrismaClient } from "@/generated/prisma/client"
 import { router, protectedProcedure } from "@/lib/trpc/server"
 import { TIER_LIMITS } from "./subscription"
 
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+async function fetchVersionWithAuth(
+  ctx: { prisma: PrismaClient; session: { user: { id: string } } },
+  versionId: string,
+) {
+  const version = await ctx.prisma.logoVersion.findUnique({
+    where: { id: versionId },
+    include: { logo: { include: { project: { select: { userId: true } } } } },
+  })
+  if (!version) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Version not found" })
+  }
+  if (version.logo.project.userId !== ctx.session.user.id) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Forbidden" })
+  }
+  return version
+}
+
+function clampAndValidateRect(
+  rect: { x: number; y: number; width: number; height: number },
+  natW: number,
+  natH: number,
+): { x: number; y: number; width: number; height: number } {
+  const x = Math.min(rect.x, natW - 1)
+  const y = Math.min(rect.y, natH - 1)
+  const width = Math.min(rect.width, natW - x)
+  const height = Math.min(rect.height, natH - y)
+  if (width < 10 || height < 10) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "크롭 영역이 너무 작습니다 (최소 10×10px)",
+    })
+  }
+  return { x, y, width, height }
+}
+
 export const exportRouter = router({
-  crop: protectedProcedure
+  previewAutoCrop: protectedProcedure
     .input(z.object({ logoVersionId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const version = await ctx.prisma.logoVersion.findUnique({
-        where: { id: input.logoVersionId },
-        include: { logo: { include: { project: { select: { userId: true } } } } },
-      })
-
-      if (!version || version.logo.project.userId !== ctx.session.user.id) {
-        throw new Error("Version not found")
-      }
+      const version = await fetchVersionWithAuth(ctx as Parameters<typeof fetchVersionWithAuth>[0], input.logoVersionId)
+      const userId = ctx.session.user.id
 
       const response = await fetch(version.imageUrl)
       const imageBuffer = Buffer.from(await response.arrayBuffer())
+
+      const srcMeta = await sharp(imageBuffer).metadata()
+      const naturalWidth = srcMeta.width ?? 0
+      const naturalHeight = srcMeta.height ?? 0
 
       const trimmed = await sharp(imageBuffer)
         .trim({ background: "#ffffff", threshold: 20 })
@@ -28,7 +66,7 @@ export const exportRouter = router({
 
       const padding = Math.round(Math.max(trimmed.info.width, trimmed.info.height) * 0.06)
       const size = Math.max(trimmed.info.width, trimmed.info.height) + padding * 2
-      const cropped = await sharp({
+      const croppedBuf = await sharp({
         create: {
           width: size,
           height: size,
@@ -36,24 +74,160 @@ export const exportRouter = router({
           background: { r: 255, g: 255, b: 255 },
         },
       })
-        .composite([
-          {
-            input: trimmed.data,
-            gravity: "center",
-          },
-        ])
+        .composite([{ input: trimmed.data, gravity: "center" }])
         .png()
         .toBuffer()
 
-      const key = getStorageKey(
-        ctx.session.user.id,
-        version.logo.projectId,
-        version.logoId,
-        `${version.id}-cropped`,
-        "png",
-      )
-      const { url, bytes: _bytes } = await uploadImage(key, cropped)
-      return { url, key }
+      const previewKey = `preview/${userId}/${crypto.randomUUID()}.png`
+      const { url: previewUrl } = await uploadImage(previewKey, croppedBuf)
+
+      return { previewUrl, previewKey, naturalWidth, naturalHeight }
+    }),
+
+  previewManualCrop: protectedProcedure
+    .input(
+      z.object({
+        logoVersionId: z.string(),
+        rect: z.object({
+          x: z.number().int().min(0),
+          y: z.number().int().min(0),
+          width: z.number().int().min(10),
+          height: z.number().int().min(10),
+        }),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const version = await fetchVersionWithAuth(ctx as Parameters<typeof fetchVersionWithAuth>[0], input.logoVersionId)
+      const userId = ctx.session.user.id
+
+      const response = await fetch(version.imageUrl)
+      const imageBuffer = Buffer.from(await response.arrayBuffer())
+
+      const srcMeta = await sharp(imageBuffer).metadata()
+      const naturalWidth = srcMeta.width ?? 0
+      const naturalHeight = srcMeta.height ?? 0
+
+      const clamped = clampAndValidateRect(input.rect, naturalWidth, naturalHeight)
+
+      const croppedBuf = await sharp(imageBuffer)
+        .extract({ left: clamped.x, top: clamped.y, width: clamped.width, height: clamped.height })
+        .png({ compressionLevel: 9 })
+        .toBuffer()
+
+      const previewKey = `preview/${userId}/${crypto.randomUUID()}.png`
+      const { url: previewUrl } = await uploadImage(previewKey, croppedBuf)
+
+      return { previewUrl, previewKey, clampedRect: clamped }
+    }),
+
+  commitCrop: protectedProcedure
+    .input(
+      z.object({
+        sourceVersionId: z.string(),
+        source: z.enum(["crop_auto", "crop_manual"]),
+        rect: z
+          .object({
+            x: z.number().int().min(0),
+            y: z.number().int().min(0),
+            width: z.number().int().min(10),
+            height: z.number().int().min(10),
+          })
+          .optional(),
+      }).refine((d) => d.source === "crop_auto" || d.rect !== undefined, {
+        message: "rect required for crop_manual",
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const version = await fetchVersionWithAuth(ctx as Parameters<typeof fetchVersionWithAuth>[0], input.sourceVersionId)
+      const userId = ctx.session.user.id
+      const projectId = version.logo.projectId
+      const logoId = version.logoId
+
+      const response = await fetch(version.imageUrl)
+      const imageBuffer = Buffer.from(await response.arrayBuffer())
+
+      let outputBuf: Buffer
+      if (input.source === "crop_auto") {
+        const trimmed = await sharp(imageBuffer)
+          .trim({ background: "#ffffff", threshold: 20 })
+          .toBuffer({ resolveWithObject: true })
+        const padding = Math.round(Math.max(trimmed.info.width, trimmed.info.height) * 0.06)
+        const size = Math.max(trimmed.info.width, trimmed.info.height) + padding * 2
+        outputBuf = await sharp({
+          create: {
+            width: size,
+            height: size,
+            channels: 3,
+            background: { r: 255, g: 255, b: 255 },
+          },
+        })
+          .composite([{ input: trimmed.data, gravity: "center" }])
+          .png()
+          .toBuffer()
+      } else {
+        const srcMeta = await sharp(imageBuffer).metadata()
+        const clamped = clampAndValidateRect(input.rect!, srcMeta.width ?? 0, srcMeta.height ?? 0)
+        outputBuf = await sharp(imageBuffer)
+          .extract({ left: clamped.x, top: clamped.y, width: clamped.width, height: clamped.height })
+          .png({ compressionLevel: 9 })
+          .toBuffer()
+      }
+
+      const aggregate = await ctx.prisma.logoVersion.findFirst({
+        where: { logoId },
+        orderBy: { versionNumber: "desc" },
+        select: { versionNumber: true },
+      })
+      const nextVersionNumber = (aggregate?.versionNumber ?? 0) + 1
+
+      const newVersion = await ctx.prisma.logoVersion.create({
+        data: {
+          logoId,
+          versionNumber: nextVersionNumber,
+          parentVersionId: input.sourceVersionId,
+          chatMessageId: null,
+          editPrompt: null,
+          imageUrl: "",
+          s3Key: "",
+          metadata: {
+            source: input.source,
+            cropRect: input.rect ?? null,
+            sourceVersionId: input.sourceVersionId,
+          } as Prisma.InputJsonValue,
+        },
+      })
+
+      const key = getStorageKey(userId, projectId, logoId, newVersion.id, "png")
+      const { url, bytes } = await uploadImage(key, outputBuf)
+
+      await ctx.prisma.$transaction([
+        ctx.prisma.logoVersion.update({
+          where: { id: newVersion.id },
+          data: { imageUrl: url, s3Key: key },
+        }),
+        ctx.prisma.usageLog.create({
+          data: {
+            userId,
+            projectId,
+            type: input.source,
+            count: 1,
+            imageCount: 1,
+            model: null,
+            imageCostUsd: 0,
+            blobBytes: BigInt(bytes),
+            blobCostUsd: blobCost(bytes),
+          },
+        }),
+      ])
+
+      return {
+        newVersion: {
+          id: newVersion.id,
+          versionNumber: newVersion.versionNumber,
+          imageUrl: url,
+          metadata: newVersion.metadata,
+        },
+      }
     }),
 
   removeBg: protectedProcedure

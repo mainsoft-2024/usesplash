@@ -90,6 +90,7 @@ model LogoVersion {
   svgUrl          String?
   s3Key           String
   editPrompt      String?  @db.Text
+  metadata        Json?
   logo            Logo     @relation(fields: [logoId], references: [id], onDelete: Cascade)
   parentVersion   LogoVersion? @relation("VersionTree", fields: [parentVersionId], references: [id])
   childVersions   LogoVersion[] @relation("VersionTree")

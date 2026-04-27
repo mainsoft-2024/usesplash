@@ -9,13 +9,21 @@ vi.mock("@/lib/trpc/client", () => ({
   trpc: {
     export: {
       crop: {
-        useMutation: () => ({
-          mutate: vi.fn(),
-          isPending: false,
-          data: null,
-        }),
+        useMutation: () => ({ mutate: vi.fn(), isPending: false, data: null }),
+      },
+      vectorize: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
     },
+    logo: {
+      uploadBaseImage: {
+        useMutation: () => ({ mutateAsync: vi.fn() }),
+      },
+    },
+    useUtils: () => ({
+      logo: { listByProject: { invalidate: vi.fn() }, invalidate: vi.fn() },
+      project: { invalidate: vi.fn() },
+    }),
   },
 }))
 
