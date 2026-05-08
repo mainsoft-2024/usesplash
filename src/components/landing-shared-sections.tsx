@@ -16,9 +16,33 @@ const features = [
 ] as const
 
 const pricing = [
-  { name: "Free", detail: "3 프로젝트 · 10회/일 생성 · 기본 내보내기", cta: "무료로 시작", href: "/login", featured: false },
-  { name: "Pro", detail: "무제한 프로젝트 · 100회/일 생성 · 프리미엄 내보내기", cta: "문의하기", href: "mailto:hello@usesplash.vercel.app", featured: true },
-  { name: "Enterprise", detail: "무제한 · 우선 생성 · 전용 지원", cta: "문의하기", href: "mailto:hello@usesplash.vercel.app", featured: false },
+  {
+    name: "Free",
+    price: "0원",
+    period: "무료",
+    detail: "3 프로젝트 · 10회/일 생성 · 기본 내보내기",
+    cta: "무료로 시작",
+    href: "/login",
+    featured: false,
+  },
+  {
+    name: "Pro 월간",
+    price: "19,900원",
+    period: "월",
+    detail: "무제한 프로젝트 · 100회/일 생성 · 프리미엄 내보내기 · 우선 지원",
+    cta: "월간 시작",
+    href: "/pricing?plan=monthly",
+    featured: true,
+  },
+  {
+    name: "Pro 연간",
+    price: "199,000원",
+    period: "년",
+    detail: "월간 대비 39,800원 절약 · 무제한 프로젝트 · 100회/일 생성 · 프리미엄 내보내기",
+    cta: "연간 시작",
+    href: "/pricing?plan=yearly",
+    featured: false,
+  },
 ] as const
 
 export function LandingSharedSections({ isLoggedIn }: { isLoggedIn: boolean }) {
@@ -71,6 +95,10 @@ export function LandingSharedSections({ isLoggedIn }: { isLoggedIn: boolean }) {
             >
               {plan.featured && <p className="mb-2 text-xs font-medium text-[var(--accent-green)]">인기</p>}
               <h3 className="text-lg font-semibold">{plan.name}</h3>
+              <p className="mt-2 flex items-baseline gap-1">
+                <span className="text-3xl font-bold text-[var(--text-primary)]">{plan.price}</span>
+                <span className="text-sm text-[var(--text-secondary)]">/ {plan.period}</span>
+              </p>
               <ul className="mt-5 space-y-2 text-sm text-[var(--text-secondary)]">
                 {plan.detail.split(" · ").map((item) => (
                   <li key={item} className="flex items-center gap-2">
