@@ -1,0 +1,1 @@
+Splash 결제 알림 메일 템플릿은 `src/lib/email/templates` 아래에 있으며, 로컬 미리보기는 `react-email` CLI가 설치된 환경에서 `email dev --dir src/lib/email/templates`로 확인할 수 있습니다. 현재 이 저장소에는 `react-email` CLI 의존성이 없어 `pnpm email:preview` 스크립트는 추가하지 않았고, 필요 시 CLI를 devDependency로 설치한 뒤 동일 명령을 package script로 등록해 사용하세요.

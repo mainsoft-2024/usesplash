@@ -19,6 +19,7 @@ model User {
   projects      Project[]
   subscription  Subscription?
   usageLogs     UsageLog[]
+  billingKeys   BillingKey[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -114,14 +115,130 @@ model ChatMessage {
 }
 
 model Subscription {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  tier             String   @default("free")
-  dailyGenerations Int      @default(0)
-  dailyResetAt     DateTime @default(now())
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  tier               String    @default("free")
+  dailyGenerations   Int       @default(0)
+  dailyResetAt       DateTime  @default(now())
+
+  // Billing
+  activeBillingKeyId String?
+  billingState       BillingState @default(free)
+  currency           String       @default("KRW")
+  nextBillingDate    DateTime?
+  failedRetryCount   Int          @default(0)
+  canceledAt         DateTime?
+  cancelReason       String?
+  cancelEffectiveAt  DateTime?
+
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeBillingKey   BillingKey? @relation("ActiveBillingKey", fields: [activeBillingKeyId], references: [id], onDelete: SetNull)
+  payments           Payment[]
+  invoices           Invoice[]
+  billingKeys        BillingKey[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([nextBillingDate, billingState])
+}
+model BillingKey {
+  id             String    @id @default(cuid())
+  userId         String
+  subscriptionId String?
+  bid            String
+  type           String                              // "domestic_card" | "international_card"
+  cardName       String?
+  cardBrand      String?
+  last4          String?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  activeFor      Subscription[] @relation("ActiveBillingKey")
+
+  @@unique([userId, bid])
+  @@index([userId, isActive])
+}
+model Payment {
+  id              String    @id @default(cuid())
+  subscriptionId  String
+  userId          String
+
+  orderId                String    @unique
+  providerPaymentId      String?
+  providerTransactionId  String?
+  paymentType     String                             // "one_shot" | "recurring"
+  paymentMethod   String                             // "card" | "vbank" | "easypay" | "cellphone"
+
+  amount          Int
+  currency        String    @default("KRW")
+
+  status          String                             // "pending" | "completed" | "failed" | "refunded" | "suspicious"
+  errorCode       String?
+  errorMessage    String?
+
+  cardName        String?
+
+  receiptUrl      String?
+
+  paidAt          DateTime?
+  refundedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([subscriptionId, createdAt])
+  invoice         Invoice?
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  subscriptionId  String
+  userId          String
+
+  periodStart     DateTime
+  periodEnd       DateTime
+  amount          Int
+  currency        String    @default("KRW")
+
+  status          String                             // pending | paid | failed | refunded
+  paymentId       String?   @unique
+  payment         Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime  @default(now())
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, periodStart])
+  @@index([userId])
+  @@index([status])
+}
+
+model WebhookEvent {
+  id              String   @id @default(cuid())
+  eventId         String   @unique
+  type            String
+  payload         Json
+  signatureValid  Boolean
+  receivedAt      DateTime @default(now())
+  processedAt     DateTime?
+  processingError String?
+
+  @@index([receivedAt])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String?
+  targetUserId String?
+  action       String
+  payload      Json
+  createdAt    DateTime @default(now())
+
+  @@index([targetUserId, createdAt])
 }
 
 
@@ -179,4 +296,12 @@ model RecraftRequestLog {
 
   @@index([createdAt])
   @@index([status, createdAt])
+}
+
+enum BillingState {
+  free
+  active
+  pending_retry
+  canceled_grace
+  expired
 }

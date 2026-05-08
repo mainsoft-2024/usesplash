@@ -1,0 +1,142 @@
+import { Prisma } from "@/generated/prisma/client";
+import * as nicepay from "@/lib/nicepay";
+import { recordPaymentResult } from "@/lib/billing/record-payment";
+import type { ProviderPaymentResult } from "@/lib/billing/types";
+import { env } from "@/lib/env";
+import { prisma } from "@/lib/prisma";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const REDIRECT_BASE = "/account/payments";
+
+function redirectTo(path: string): Response {
+  return new Response(null, { status: 303, headers: { Location: path } });
+}
+
+async function writeAudit(action: string, payload: Record<string, unknown>, targetUserId?: string): Promise<void> {
+  await prisma.auditLog.create({ data: { action, targetUserId, payload: payload as unknown as Prisma.InputJsonValue } });
+}
+
+async function markFailed(orderId: string, code: string, message?: string): Promise<void> {
+  await prisma.payment.updateMany({
+    where: { orderId },
+    data: { status: "failed", errorCode: code, errorMessage: message ?? null },
+  });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const authResultCode = String(formData.get("authResultCode") ?? "");
+    const authResultMsg = String(formData.get("authResultMsg") ?? "");
+    const authToken = String(formData.get("authToken") ?? "");
+    const tid = String(formData.get("tid") ?? "");
+    const orderId = String(formData.get("orderId") ?? "");
+    const amount = String(formData.get("amount") ?? "");
+    const signature = String(formData.get("signature") ?? "");
+    const ediDate = String(formData.get("ediDate") ?? "");
+    const mallReserved = formData.get("mallReserved")?.toString();
+    const mid = formData.get("mid")?.toString();
+    const method = formData.get("method")?.toString();
+
+    if (authResultCode !== "0000") {
+      await markFailed(orderId, `auth_${authResultCode}`, authResultMsg);
+      await writeAudit(`payment_return_auth_${authResultCode}`, { orderId, tid, amount, authResultMsg });
+      return redirectTo(`${REDIRECT_BASE}?status=failed&reason=auth_${authResultCode}`);
+    }
+
+    const payment = await prisma.payment.findUnique({ where: { orderId } });
+    if (!payment || payment.status !== "pending") {
+      await writeAudit("payment_return_unknown_order", { orderId, tid, amount });
+      return redirectTo(`${REDIRECT_BASE}?status=failed&reason=unknown_order`);
+    }
+
+    const expectedSignature = nicepay.signApprove({
+      authToken,
+      clientId: env.NICEPAY_CLIENT_ID,
+      amount,
+      ediDate,
+      secretKey: env.NICEPAY_SECRET_KEY,
+    });
+
+    if (!nicepay.timingSafeEqual(expectedSignature, signature)) {
+      await markFailed(orderId, "signature_mismatch", "signature_mismatch");
+      await writeAudit("payment_return_signature_mismatch", { orderId, tid, amount, ediDate, mallReserved, mid }, payment.userId);
+      return redirectTo(`${REDIRECT_BASE}?status=failed&reason=signature_mismatch`);
+    }
+
+    if (Number(amount) !== payment.amount) {
+      await markFailed(orderId, "amount_mismatch", "amount_mismatch");
+      await writeAudit("payment_return_amount_mismatch", { orderId, tid, amount, dbAmount: payment.amount }, payment.userId);
+      return redirectTo(`${REDIRECT_BASE}?status=failed&reason=amount_mismatch`);
+    }
+
+    let approveResponse;
+    try {
+      approveResponse = await nicepay.payments.approve({ tid, amount: Number(amount), ediDate });
+    } catch (error) {
+      const maybeError = error as { resultCode?: string; resultMsg?: string; message?: string };
+      const code = maybeError.resultCode ?? "approval_error";
+      await markFailed(orderId, code, maybeError.resultMsg ?? maybeError.message);
+      await writeAudit(`payment_return_approval_${code}`, { orderId, tid, amount }, payment.userId);
+      return redirectTo(`${REDIRECT_BASE}?status=failed&reason=approval_${code}`);
+    }
+
+    const adapted = nicepay.toProviderPaymentResult(approveResponse);
+    const billingResult: ProviderPaymentResult = {
+      orderId: adapted.orderId,
+      providerPaymentId: adapted.providerPaymentId,
+      providerTransactionId: adapted.providerTransactionId,
+      paid: adapted.status === "paid",
+      amount: adapted.amount,
+      currency: "KRW",
+      paidAt: adapted.paidAt,
+      paymentMethod: method === "card" ? "card" : "other",
+      paymentType: "one_shot",
+      failureReason:
+        adapted.status === "paid"
+          ? undefined
+          : {
+              code: adapted.errorCode ?? "approval_failed",
+              message: adapted.errorMessage ?? "approval_failed",
+            },
+      raw: approveResponse,
+    };
+
+    await recordPaymentResult({ subscriptionId: payment.subscriptionId, paymentResult: billingResult });
+
+    if (method === "card") {
+      try {
+        const activeBillingKey = await prisma.billingKey.findFirst({ where: { userId: payment.userId, isActive: true } });
+        const alreadyPaidPro = await prisma.payment.count({
+          where: { userId: payment.userId, status: "completed", amount: payment.amount, id: { not: payment.id } },
+        });
+        if (!activeBillingKey && alreadyPaidPro === 0) {
+          const bid = formData.get("bid")?.toString();
+          if (bid) {
+            await prisma.billingKey.create({
+              data: {
+                userId: payment.userId,
+                subscriptionId: payment.subscriptionId,
+                bid,
+                type: "domestic_card",
+                cardName: formData.get("cardName")?.toString() ?? null,
+                cardBrand: formData.get("cardBrand")?.toString() ?? null,
+                last4: formData.get("last4")?.toString() ?? null,
+                isActive: true,
+              },
+            });
+          }
+        }
+      } catch {
+        await writeAudit("payment_return_billing_key_issue_failed", { orderId, tid, amount }, payment.userId);
+      }
+    }
+
+    return redirectTo(`${REDIRECT_BASE}?status=success&orderId=${encodeURIComponent(orderId)}`);
+  } catch {
+    await writeAudit("payment_return_internal_error", {});
+    return new Response("Internal Server Error", { status: 500 });
+  }
+}
