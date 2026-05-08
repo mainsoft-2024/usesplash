@@ -6,7 +6,7 @@ const { approveMock, recordMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/nicepay", () => ({
-  signApprove: vi.fn(() => "sig"),
+  signReturnUrl: vi.fn(() => "sig"),
   timingSafeEqual: vi.fn((a: string, b: string) => a === b),
   payments: { approve: approveMock },
   toProviderPaymentResult: vi.fn((raw: { orderId: string; tid: string; amount: number }) => ({

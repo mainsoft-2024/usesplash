@@ -52,11 +52,10 @@ export async function POST(request: Request): Promise<Response> {
       return redirectTo(`${REDIRECT_BASE}?status=failed&reason=unknown_order`);
     }
 
-    const expectedSignature = nicepay.signApprove({
+    const expectedSignature = nicepay.signReturnUrl({
       authToken,
       clientId: env.NICEPAY_CLIENT_ID,
       amount,
-      ediDate,
       secretKey: env.NICEPAY_SECRET_KEY,
     });
 

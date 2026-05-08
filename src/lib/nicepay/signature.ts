@@ -2,8 +2,19 @@ import { createHash, timingSafeEqual as cryptoTimingSafeEqual } from "node:crypt
 
 const sha256Hex = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
 
-/** sha256(authToken + clientId + amount + ediDate + secretKey). */
-export const signApprove = ({ authToken, clientId, amount, ediDate, secretKey }: { authToken: string; clientId: string; amount: string | number; ediDate: string; secretKey: string }) => sha256Hex(`${authToken}${clientId}${amount}${ediDate}${secretKey}`);
+/**
+ * Return URL signature verification (NICE → 가맹점).
+ * NICE가 returnUrl로 POST할 때 함께 보내는 `signature` 검증용.
+ * 공식 공식: hex(sha256(authToken + clientId + amount + SecretKey))  — ediDate 없음.
+ */
+export const signReturnUrl = ({ authToken, clientId, amount, secretKey }: { authToken: string; clientId: string; amount: string | number; secretKey: string }) => sha256Hex(`${authToken}${clientId}${amount}${secretKey}`);
+
+/**
+ * Approve API 본문 signData (가맹점 → NICE).
+ * POST /v1/payments/{tid} 요청의 body 안에 넘기는 값.
+ * 공식 공식: hex(sha256(tid + amount + ediDate + SecretKey))
+ */
+export const signApprove = ({ tid, amount, ediDate, secretKey }: { tid: string; amount: string | number; ediDate: string; secretKey: string }) => sha256Hex(`${tid}${amount}${ediDate}${secretKey}`);
 /** sha256(orderId + ediDate + secretKey). */
 export const signBilling = ({ orderId, ediDate, secretKey }: { orderId: string; ediDate: string; secretKey: string }) => sha256Hex(`${orderId}${ediDate}${secretKey}`);
 /** sha256(orderId + bid + ediDate + secretKey). */
