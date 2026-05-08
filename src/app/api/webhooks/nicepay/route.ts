@@ -160,7 +160,8 @@ export async function POST(request: Request): Promise<Response> {
   try {
     payload = JSON.parse(bodyText) as WebhookPayload;
   } catch {
-    return Response.json({ ok: false, reason: "invalid_json" }, { status: 400 });
+    // 더미/핀 요청이거나 빈 본문 — NICE가 URL 등록 검증에서 JSON 아닌 더미를 보낼 수 있음. 200으로 ack.
+    return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
 
   const type = asString(payload.type) ?? "unknown";
@@ -175,8 +176,11 @@ export async function POST(request: Request): Promise<Response> {
 
   const expectedSignature = signWebhook({ authToken, clientId, orderId, amount, secretKey: env.NICEPAY_SECRET_KEY });
   if (!timingSafeEqual(expectedSignature, signData)) {
-    await persistInvalidSignature({ eventId, type, payload });
-    return Response.json({ ok: false, reason: "invalid_signature" }, { status: 400 });
+    // 시그니처 불일치 — 기록만 남기고 200으로 ack.
+    // (NICE 등록 검증 더미 페이로드는 적절한 시그니처 없을 수 있으며,
+    //  실 실패 콜백도 200으로 ack 해야 무한 재시도 방지)
+    try { await persistInvalidSignature({ eventId, type, payload }); } catch { /* ignore */ }
+    return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
 
   try {

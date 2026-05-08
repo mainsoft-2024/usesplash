@@ -27,11 +27,10 @@ describe("POST /api/webhooks/nicepay", () => {
     recordPaymentResult.mockResolvedValue({});
   });
 
-  it("returns 400 invalid_json", async () => {
+  it("acks invalid json with 200 (NICE 등록 검증 대응)", async () => {
     const { POST } = await import("./route");
     const response = await POST(new Request("http://localhost/api/webhooks/nicepay", { method: "POST", body: "{" }));
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ ok: false, reason: "invalid_json" });
+    expect(response.status).toBe(200);
   });
 
   it("returns 400 on invalid signature and persists invalid webhook row", async () => {
@@ -43,8 +42,7 @@ describe("POST /api/webhooks/nicepay", () => {
         body: JSON.stringify({ eventId: "evt-1", type: "recurring_paid", signData: "bad", tid: "tid", ediDate: "20260101", orderId: "o1", amount: 19900 }),
       }),
     );
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ ok: false, reason: "invalid_signature" });
+    expect(response.status).toBe(200);
     expect(prismaMock.webhookEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ eventId: "evt-1", signatureValid: false, processingError: "invalid_signature" }) }),
     );
