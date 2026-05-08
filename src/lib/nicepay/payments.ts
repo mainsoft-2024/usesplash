@@ -5,11 +5,18 @@ import type { NicepayApprovalResponse, NicepayCancelResponse } from "./types";
 
 const kstIso = () => new Date().toISOString().replace("Z", "+09:00");
 
-/** POST /v1/payments/{tid} approval. */
-export function approve(input: { tid: string; amount: number; ediDate?: string; signData?: string }) {
-  const cfg = getNicepayConfig(); const ediDate = input.ediDate ?? kstIso();
-  const signData = input.signData ?? signApprove({ authToken: input.tid, clientId: cfg.clientId, amount: input.amount, ediDate, secretKey: cfg.secretKey });
-  return nicepayFetch<NicepayApprovalResponse>(`/v1/payments/${input.tid}`, { method: "POST", body: { amount: input.amount, ediDate, signData, returnCharSet: "utf-8" } });
+/** POST /v1/payments/{tid} approval. authToken is required (received via the return URL).
+ *  Signature formula: hex(sha256(authToken + clientId + amount + ediDate + secretKey)). */
+export function approve(input: { tid: string; authToken: string; amount: number; ediDate?: string; signData?: string }) {
+  const cfg = getNicepayConfig();
+  const ediDate = input.ediDate ?? kstIso();
+  const signData =
+    input.signData ??
+    signApprove({ authToken: input.authToken, clientId: cfg.clientId, amount: input.amount, ediDate, secretKey: cfg.secretKey });
+  return nicepayFetch<NicepayApprovalResponse>(`/v1/payments/${input.tid}`, {
+    method: "POST",
+    body: { amount: input.amount, ediDate, signData, returnCharSet: "utf-8" },
+  });
 }
 /** POST /v1/payments/{tid}/cancel. */
 export function cancel(input: { tid: string; opts: Record<string, unknown> }) {

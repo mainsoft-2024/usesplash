@@ -72,14 +72,24 @@ export async function POST(request: Request): Promise<Response> {
       return redirectTo(`${REDIRECT_BASE}?status=failed&reason=amount_mismatch`);
     }
 
-    let approveResponse;
+    let approveResponse: Awaited<ReturnType<typeof nicepay.payments.approve>>;
     try {
-      approveResponse = await nicepay.payments.approve({ tid, amount: Number(amount), ediDate });
+      approveResponse = await nicepay.payments.approve({ tid, authToken, amount: Number(amount), ediDate });
     } catch (error) {
       const maybeError = error as { resultCode?: string; resultMsg?: string; message?: string };
       const code = maybeError.resultCode ?? "approval_error";
       await markFailed(orderId, code, maybeError.resultMsg ?? maybeError.message);
-      await writeAudit(`payment_return_approval_${code}`, { orderId, tid, amount }, payment.userId);
+      await writeAudit(`payment_return_approval_${code}`, { orderId, tid, amount, message: maybeError.message ?? null }, payment.userId);
+      return redirectTo(`${REDIRECT_BASE}?status=failed&reason=approval_${code}`);
+    }
+
+    // NICE는 HTTP 200으로 응답하면서도 resultCode ≠ '0000' 으로 승인 실패를 돌려줄 수 있음.
+    // 이 경우 recordPaymentResult 에 paid:false로 보내면 state machine이 free→charge_failed를 불법으로 간주함.
+    // 그래서 안전장치: 0000이 아닌 경우 markFailed만 하고 종료.
+    if (approveResponse.resultCode !== "0000") {
+      const code = approveResponse.resultCode ?? "approval_failed";
+      await markFailed(orderId, code, approveResponse.resultMsg ?? null);
+      await writeAudit(`payment_return_approval_${code}`, { orderId, tid, amount, resultMsg: approveResponse.resultMsg ?? null }, payment.userId);
       return redirectTo(`${REDIRECT_BASE}?status=failed&reason=approval_${code}`);
     }
 
