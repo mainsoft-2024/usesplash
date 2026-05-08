@@ -135,8 +135,16 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     return redirectTo(`${REDIRECT_BASE}?status=success&orderId=${encodeURIComponent(orderId)}`);
-  } catch {
-    await writeAudit("payment_return_internal_error", {});
-    return new Response("Internal Server Error", { status: 500 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    // eslint-disable-next-line no-console
+    console.error("[nicepay-return] internal error", { message, stack });
+    try {
+      await writeAudit("payment_return_internal_error", { message, stack });
+    } catch {
+      // ignore audit write failures during error path
+    }
+    return redirectTo(`${REDIRECT_BASE}?status=failed&reason=internal_error&detail=${encodeURIComponent(message)}`);
   }
 }

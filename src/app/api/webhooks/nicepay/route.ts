@@ -143,10 +143,14 @@ async function dispatchByType(type: string, payload: WebhookPayload): Promise<vo
   });
 }
 
-// NICE 가맹점 콘솔에서 webhook URL 등록 시 GET으로 200 헬스체크를 수행함.
+// NICE 가맹점 콘솔에서 webhook URL 등록 시 GET/HEAD로 200 헬스체크를 수행함.
 // 실제 webhook 이벤트는 POST로 도착.
 export async function GET(): Promise<Response> {
-  return Response.json({ ok: true });
+  return new Response("OK", { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+}
+
+export async function HEAD(): Promise<Response> {
+  return new Response(null, { status: 200 });
 }
 
 export async function POST(request: Request): Promise<Response> {
