@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { trpc } from "@/lib/trpc/client"
 import { LoadingScreen } from "@/components/spinners"
 import { UsageStats } from "@/components/usage-stats"
+import { UpgradeCta } from "@/components/dashboard/upgrade-cta"
 
 function ThumbnailGrid({ thumbnails }: { thumbnails: string[] }) {
   if (thumbnails.length === 0) {
@@ -129,6 +130,10 @@ export default function ProjectsPage() {
           >
             + 새 프로젝트
           </button>
+        </div>
+
+        <div className="mb-6">
+          <UpgradeCta />
         </div>
 
         <div className="mb-8">
