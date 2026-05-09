@@ -116,6 +116,13 @@ export function SharedHeader({ session }: { session: HeaderSession | null }) {
                     >
                       대시보드로 이동
                     </Link>
+                    <Link
+                      href="/account/payments"
+                      className="block rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                      onClick={() => setDropdownOpen(false)}
+                    >
+                      결제 관리
+                    </Link>
                     <button
                       onClick={() => signOut({ callbackUrl: "/" })}
                       className="w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--accent-red)] transition-colors hover:bg-[var(--bg-tertiary)]"
@@ -179,6 +186,13 @@ export function SharedHeader({ session }: { session: HeaderSession | null }) {
                   onClick={() => setMobileOpen(false)}
                 >
                   대시보드로 이동
+                </Link>
+                <Link
+                  href="/account/payments"
+                  className="text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  결제 관리
                 </Link>
                 <button
                   onClick={() => { setMobileOpen(false); signOut({ callbackUrl: "/" }) }}
