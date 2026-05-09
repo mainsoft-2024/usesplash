@@ -123,6 +123,7 @@ export async function recordPaymentResult(
         errorCode: result.failureReason?.code ?? null,
         errorMessage: result.failureReason?.message ?? null,
         cardName: result.cardName ?? null,
+        receiptUrl: result.receiptUrl ?? undefined,
         paidAt: result.paidAt ?? new Date(),
       },
       create: {
@@ -139,6 +140,7 @@ export async function recordPaymentResult(
         errorCode: result.failureReason?.code ?? null,
         errorMessage: result.failureReason?.message ?? null,
         cardName: result.cardName ?? null,
+        receiptUrl: result.receiptUrl ?? null,
         paidAt: result.paidAt ?? new Date(),
       },
     });

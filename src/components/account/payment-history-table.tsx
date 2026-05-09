@@ -23,10 +23,7 @@ function formatDate(value: string | Date): string {
   return d.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
 }
 
-function nicepayReceiptUrl(tid: string | null): string | null {
-  if (!tid) return null;
-  return `https://npg.nicepay.co.kr/issue/IssueLoader.do?Tid=${encodeURIComponent(tid)}`;
-}
+
 
 export function PaymentHistoryTable() {
   const query = trpc.payment.listPayments.useInfiniteQuery(
@@ -60,7 +57,7 @@ export function PaymentHistoryTable() {
         <tbody>
           {rows.map((p) => {
             const eligible = p.status === "paid" || p.status === "completed";
-            const receipt = nicepayReceiptUrl(p.providerPaymentId);
+            const receipt = p.receiptUrl ?? null;
             return (
               <tr key={p.id} className="border-b border-[var(--border-primary)]/40">
                 <td className="py-2">{formatDate(p.createdAt)}</td>

@@ -81,7 +81,7 @@ export const paymentRouter = router({
         orderBy: { createdAt: "desc" },
         take: input.limit + 1,
         ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
-        select: { id: true, orderId: true, status: true, amount: true, currency: true, providerPaymentId: true, createdAt: true, paidAt: true },
+        select: { id: true, orderId: true, status: true, amount: true, currency: true, providerPaymentId: true, receiptUrl: true, createdAt: true, paidAt: true },
       });
       const nextCursor = rows.length > input.limit ? rows[input.limit]?.id : null;
       return { items: rows.slice(0, input.limit), nextCursor };

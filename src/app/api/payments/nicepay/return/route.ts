@@ -103,6 +103,7 @@ export async function POST(request: Request): Promise<Response> {
       amount: adapted.amount,
       currency: "KRW",
       paidAt: adapted.paidAt,
+      receiptUrl: adapted.receiptUrl,
       paymentMethod: method === "card" ? "card" : "other",
       paymentType: "one_shot",
       failureReason:

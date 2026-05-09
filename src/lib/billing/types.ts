@@ -6,6 +6,7 @@ export type ProviderPaymentResult = {
   amount: number;
   currency: "KRW";
   paidAt?: Date;
+  receiptUrl?: string;
   paymentMethod: "card" | "vbank" | "cellphone" | "easypay" | "other";
   paymentType?: "one_shot" | "recurring";
   cardName?: string;
