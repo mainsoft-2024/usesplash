@@ -1,0 +1,5 @@
+{
+  "name": "nicepay_start_api",
+  "command": "node",
+  "args": ["./launch-start-api.cjs"]
+}

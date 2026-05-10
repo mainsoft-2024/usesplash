@@ -1,0 +1,30 @@
+{
+  "name": "@mainsoft/slash-ai-cli",
+  "version": "1.0.4",
+  "description": "S/ASH AI agent runtime instruction delivery CLI",
+  "type": "module",
+  "bin": {
+    "slash-ai": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outdir dist --target node --format esm",
+    "dev": "bun run src/cli.ts"
+  },
+  "dependencies": {
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.24.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  },
+  "files": [
+    "dist/"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

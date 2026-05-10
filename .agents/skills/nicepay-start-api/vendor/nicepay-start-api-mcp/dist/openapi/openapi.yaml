@@ -1,0 +1,2073 @@
+openapi: 3.1.0
+info:
+  title: NICEPAY 통합 API
+  version: 0.0.1
+  summary: NICEPAY의 모든 API 기능을 포함하는 통합 명세서
+  description: 클라이언트 결제창 호출부터 서버 최종 승인까지, 전체 결제를 위한 명세서
+
+servers:
+  - url: https://sandbox-api.nicepay.co.kr
+    description: 개발 및 테스트용 샌드박스 서버
+  - url: https://api.nicepay.co.kr
+    description: 실제 운영 환경용 프로덕션 서버
+
+paths:
+#==================================================================
+# 결제 (Payment Process)
+#==================================================================
+  /v1/ui/payment-window:
+    post:
+      summary: "[1단계: 클라이언트] NICEPAY JS SDK 기반 결제창 호출 코드 생성. `AUTHNICE.requestPay()` 실행을 위한 HTML 스니펫을 반환하며, 인증 실패 처리 위한 `fnError` 콜백 필요."
+      description: |
+        NICEPAY 결제 흐름 **1단계(클라이언트)** 에 해당
+        이 툴은 JavaScript SDK 방식 결제창 호출 코드(JS 및 HTML) 생성
+
+        **사용 조건:**
+        - `AUTHNICE.requestPay()` 메서드 사용, NICEPAY JS SDK 스크립트 HTML에 포함 필요
+        - `fnError` 콜백은 인증 실패/취소 처리 위해 필수
+        - 생성된 코드는 웹사이트에 직접 삽입 가능
+
+        **다음 단계:**
+        - 결제 인증 성공 시 `returnUrl`로 전달되는 `tid`는 서버에서 `approve_payment` API 호출 시 사용
+      operationId: create_payment_window
+      tags:
+        - "결제"
+      x-mcp-client-tool: true
+      requestBody:
+        description: 결제창에 필요한 초기 정보 입력
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWindowRequest'
+      callbacks:
+        onPaymentAuthenticated:
+          $ref: '#/components/callbacks/PaymentAuthCallback'
+      responses:
+        '200':
+          description: 결제창 호출 HTML/JS 코드가 성공적으로 생성
+      x-js-sdk:
+        scriptUrl: "https://pay.nicepay.co.kr/v1/js/"
+        globalMethod: "AUTHNICE.requestPay"
+        requiredCallbacks:
+          - name: "fnError"
+            description: "결제 실패 또는 취소 시 반드시 호출되는 콜백 함수"          
+      x-mcp-template: |
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>NICEPAY 결제 요청</title>
+          <script src="https://pay.nicepay.co.kr/v1/js/"></script>
+        </head>
+        <body>
+          <button onclick="requestPay()">결제하기</button>
+          <script>
+            function requestPay() {
+              AUTHNICE.requestPay({
+                clientId: "YOUR_CLIENT_ID",
+                method: "card",
+                orderId: "ORDER123456",
+                amount: 10000,
+                goodsName: "샘플 상품",
+                returnUrl: "https://your.site.com/payment/result",
+                fnError: function (result) {
+                  alert(result.errorMsg);
+                }
+              });
+            }
+          </script>
+        </body>
+        </html>
+
+  /v1/payments/{tid}:
+    post:
+      summary: "[2단계: 서버] 결제 승인을 위한 API 호출 정보 제공"
+      description: |
+        NICEPAY 결제 흐름 **2단계(서버)** 로, 클라이언트 측 인증 후 결제 승인을 진행
+
+        **이 툴 목적:**
+        - 직접 결제 처리하지 않으며, 서버에서 사용할 **API 호출 사양(JSON)** 반환
+        - 반환값에는 HTTP 메서드, URL, 헤더, 바디 등 API 호출을 구성하는 필수 정보가 포함
+
+        **사용 시나리오:**
+        1. 먼저 `create_payment_window` 툴을 통해 `tid` 발급 필요
+        2. 본 툴을 호출하면, 결제 승인에 필요한 API 호출 구조가 반환
+        3. 이 JSON을 바탕으로 원하는 언어(Python, Node.js 등)로 서버 코드 생성해 호출하면 실제 결제 완료
+      operationId: approve_payment
+      x-mcp-prerequisites:
+        - create_payment_window
+      tags:
+        - "결제"
+      parameters:
+        - name: tid
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "nicuntct1m0101210727200708A058"
+          description: "[1단계]에서 발급된 고유 거래 ID"          
+      requestBody:
+        description: 결제 승인에 필요한 정보 전달.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRequest'
+      responses:
+        '200':
+          description: 결제 승인 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+
+  /v1/payments/{tid}/cancel:
+    post:
+      summary: "[3단계: 서버] 결제 취소 위한 API 호출 정보 제공"
+      description: |
+        **이 툴은 결제 취소 API 호출하는 데 필요한 정보 JSON 형식으로 반환**
+        모델은 이 정보 바탕으로, 사용자가 요청하는 프로그래밍 언어에 맞는 서버 코드 생성 필요
+        부분 취소와 전체 취소 모두 지원
+      operationId: cancel_payment
+      x-mcp-prerequisites:
+        - approve_payment
+      tags:
+        - "결제"
+      parameters:
+        - name: tid
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "nicuntct1m0101210727200708A058"
+          description: "취소할 원거래 거래 ID"
+      requestBody:
+        description: 결제 취소에 필요한 정보 전달
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelRequest'
+      responses:
+        '200':
+          description: 결제 취소 성공. 응답은 결제 승인과 동일 구조
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+
+#==================================================================
+# 정기결제
+#==================================================================
+  /v1/subscribe/regist:
+    post:
+      summary: "[서버] 빌링키(정기결제 키) 발급을 위한 암호화 요청 정보 반환"
+      description: |
+        **이 MCP 툴은 암호화된 카드 정보 포함한 API 요청을 생성하기 위한 정보 반환**
+
+        모델은 다음 절차에 따라, 사용자가 요청한 언어에 맞는 **암호화 포함 실행 코드 생성 필요**
+
+        ### 암호화 전처리 순서
+        1. `BillingKeyData` 필드 기반으로 `key=value`& 연결 형태 평문 쿼리 문자열을 생성
+        2. 해당 평문을 AES-256-CBC 방식으로 암호화. (IV 포함, SecretKey는 사용자가 입력)
+        3. 암호화된 바이트 스트림을 Hex 인코딩하여 `encData` 문자열을 만듭니다
+        4. 이 `encData`를 `requestBody`에 포함하여 API를 호출하는 코드 생성
+
+        > 예시 평문:
+        > `cardNo=4111111111111111&expYear=25&expMonth=12&birth=900101&cardPw=11`
+
+        - 이 툴은 `encData`를 직접 생성하지 않으며, 모델 책임
+        - 모델은 응답값을 사용하여 암호화 전처리 및 API 호출 코드 **직접 생성**
+      operationId: create_billing_key
+      tags:
+        - "정기결제"
+      x-mcp-client-tool: true
+      x-mcp-encryption-guide:
+        encryption:
+          algorithm: AES-256-CBC
+          keyLength: 256
+          ivRequired: true
+          encoding: hex
+        sourceFields: [cardNo, expYear, expMonth, birth, cardPw]
+        format: "key=value&key=value..."
+        samplePlaintext: "cardNo=4111111111111111&expYear=25&expMonth=12&birth=900101&cardPw=11"
+        languageTargets: [javascript, python, java]
+      requestBody:
+        description: 암호화된 카드 정보 및 추가 거래 정보 포함한 요청 본문
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingKeyRegistrationRequest'
+            example:
+              encData: "hexEncodedEncryptedStringHere"
+              merchantId: "nicepay1234"
+              timestamp: "20250630110000"
+              authToken: "optional-token"
+      responses:
+        '200':
+          description: 빌링키 발급 성공 시 응답
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingKeyRegistrationResponse'
+
+
+  /v1/subscribe/{bid}/payments:
+    post:
+      summary: "[서버] 발급된 빌링키로 결제 승인"
+      description: |
+        **이 툴은 `create_billing_key` 툴로 발급받은 빌링키(BID) 사용하여 정기결제 또는 간편결제 승인하는 API 호출 정보를 JSON으로 반환**
+        모델은 이 정보 바탕으로, 사용자가 요청하는 프로그래밍 언어에 맞는 서버 코드 생성 필요
+      operationId: approve_billing_payment
+      x-mcp-prerequisites:
+        - create_billing_key
+      tags:
+        - "정기결제"
+      parameters:
+        - name: bid
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "BIKYnictest00m1104191651325596"
+          description: "이전에 발급받은 고유한 빌링키"
+      requestBody:
+        description: 빌링키 결제 승인에 필요한 정보 전달
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingApprovalRequest'
+      responses:
+        '200':
+          description: 빌링키 결제 승인 성공. 응답은 일반 결제 승인과 동일 구조
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+
+  /v1/subscribe/{bid}/expire:
+    post:
+      summary: "[서버] 발급된 빌링키 삭제(만료)."
+      description: |
+        **이 툴은 `create_billing_key` 툴로 발급받은 빌링키(BID) 만료시키는 API**
+        모델은 이 정보 바탕으로, 사용자가 요청하는 프로그래밍 언어에 맞는 서버 코드 생성 필요
+      operationId: expire_billing_key
+      x-mcp-prerequisites:
+        - create_billing_key
+      tags:
+        - "정기결제"
+      parameters:
+        - name: bid
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "BIKYnictest00m1104191651325596"
+          description: "삭제(만료)할 고유한 빌링키"
+      requestBody:
+        description: 빌링키 삭제에 필요한 정보 전달
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingKeyExpireRequest'
+      responses:
+        '200':
+          description: 빌링키 삭제 성공.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingKeyExpireResponse'
+
+#==================================================================
+# 영수증
+#==================================================================
+  /v1/receipt/:
+    post:
+      summary: "[서버] 현금영수증을 발급"
+      description: |
+        **[POST 요청] 이 툴은 현금영수증 발급 API 호출하는 데 필요한 정보 JSON 형식으로 반환**
+
+        - HTTP Method: `POST`
+        - Path: `/v1/receipt/`
+
+        모델은 이 정보 바탕으로, 사용자가 요청하는 프로그래밍 언어에 맞는 **POST 방식 서버 코드 생성 필요**
+      operationId: create_cash_receipt
+      tags:
+        - "영수증"
+      x-mcp-client-tool:
+        method: POST
+        description: "POST 방식으로 현금영수증을 발급 요청하는 클라이언트 툴"
+      requestBody:
+        description: 현금영수증 발급에 필요한 정보 전달
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CashReceiptRequest'
+      responses:
+        '200':
+          description: 현금영수증 발급 성공.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashReceiptResponse'
+
+  /v1/receipt/{tid}/cancel:
+    post:
+      summary: "[서버] 발급된 현금영수증을 취소"
+      description: |
+        **[POST 요청] 이 툴은 발급된 현금영수증을 취소하는 API 호출 정보 JSON 형식으로 반환**
+
+        - HTTP Method: `POST`
+        - Path: `/v1/receipt/{tid}/cancel`
+
+        모델은 이 정보 바탕으로, 사용자가 요청하는 언어에 맞는 **POST 방식 서버 호출 코드** 생성 필요
+        본 API는 전체 취소와 부분 취소 모두 지원
+      operationId: cancel_cash_receipt
+      tags:
+        - "영수증"
+      x-mcp-client-tool:
+        method: POST
+        description: "POST 방식으로 현금영수증을 취소 요청하는 클라이언트 툴"
+      parameters:
+        - name: tid
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "nictest_2.0_1_160101120000_1234567890"
+          description: "취소할 원 현금영수증 거래 거래 ID"
+      requestBody:
+        description: 현금영수증 취소에 필요한 정보 전달
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CashReceiptCancelRequest'
+      responses:
+        '200':
+          description: 현금영수증 취소 성공.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashReceiptCancelResponse'
+
+  /v1/receipt/{tid}:
+    get:
+      summary: "[조회] 발급된 현금영수증 처리 상태 조회"
+      description: |
+        **[GET 요청] 이 툴은 `create_cash_receipt` 툴로 발급 요청한 현금영수증 최종 발급(승인) 여부 조회**
+
+        - HTTP Method: `GET`
+        - Path: `/v1/receipt/{tid}`
+        - Query Params: `orderDate`, `ediDate`, `signData`, `returnCharSet` (선택적)
+
+        **[주의]** 발급 요청 성공 후 **D+2일** 조회 필요
+
+        모델은 이 정보 바탕으로 사용자가 요청한 언어에 맞는 **GET 방식 호출 코드** 생성 필요
+      operationId: get_cash_receipt_status
+      x-mcp-client-tool:
+        method: GET
+        description: "GET 방식으로 현금영수증 조회 API 호출하는 클라이언트 툴"
+      x-mcp-prerequisites:
+        - create_cash_receipt
+      tags:
+        - "영수증"
+      parameters:
+        - name: tid
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "nictest_2.0_1_160101120000_1234567890"
+          description: "조회할 원 현금영수증 거래 거래 ID"
+        - name: orderDate
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 8
+            example: "20250630"
+          description: "(옵션) 주문일자 (YYYYMMDD 형식)"
+        - name: ediDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: "(옵션) 전문생성일시 (ISO 8601 형식)"
+        - name: signData
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 256
+          description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(tid + ediDate + SecretKey))"
+        - name: returnCharSet
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+            default: "utf-8"
+          description: "(옵션) 응답 파라미터 인코딩 방식"
+      responses:
+        '200':
+          description: 현금영수증 조회 성공.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashReceiptQueryResponse'
+
+
+#==================================================================
+# 조회
+#==================================================================
+  /v1/payments/find/{orderId}:
+    get:
+      summary: "[거래 조회] 주문번호 사용하여 거래 내역을 조회"
+      description: |
+        **[GET 요청] 이 API는 가맹점 주문번호(orderId) 사용하여 해당 거래 상세 내역을 조회**
+
+        - HTTP Method: `GET`
+        - Path: `/v1/payments/find/{orderId}`
+        - Query Params: `orderDate`, `ediDate`, `signData`, `returnCharSet` (선택)
+
+        모델은 이 정보 바탕으로 사용자가 요청하는 언어에 맞는 **GET 방식 코드 (JavaScript, Python 등)** 생성 필요
+        
+        ⚠️ 이 API는 인증 요청 및 위변조 검증용 파라미터 포함할 수 있으며, URL과 쿼리스트링 구성에 주의
+      operationId: find_payment_by_order_id
+      tags:
+        - "조회"
+      x-mcp-client-tool:
+        method: GET
+        description: "주문번호로 거래 조회하는 GET 방식 MCP 클라이언트 툴"
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "my-order-12345"
+          description: 조회할 거래 가맹점 주문번호
+        - name: orderDate
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 8
+            example: "20250630"
+          description: "(옵션) 주문일자 (YYYYMMDD 형식)"
+        - name: ediDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: "(옵션) 전문생성일시 (ISO 8601 형식)"
+        - name: signData
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 256
+          description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(tid + ediDate + SecretKey))"
+        - name: returnCharSet
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+            default: "utf-8"
+          description: "(옵션) 응답 파라미터 인코딩 방식"
+      responses:
+        '200':
+          description: 거래 조회 성공. 응답은 결제 승인과 동일 구조
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+
+  /v1/terms:
+    get:
+      summary: "[조회] NICEPAY 약관 내용 조회"
+      description: |
+        **[GET 요청] 특정 약관 유형(`termsType`)에 대한 제목 및 전체 내용 조회**
+
+        - HTTP Method: `GET`
+        - Path: `/v1/terms`
+
+        **[중요] 이 API는 운영 환경(`https://api.nicepay.co.kr`)에서만 호출 가능**
+        - 샌드박스 환경에서는 약관 호출이 **지원되지 않습니다**.
+
+        모델은 이 정보 바탕으로, 사용자가 요청한 언어에 맞는 **GET 방식 요청 코드** 생성 필요
+      operationId: get_terms
+      tags:
+        - "조회"
+      x-mcp-client-tool:
+        method: GET
+        description: "운영 환경에서 약관 내용을 조회하는 GET 방식 MCP 클라이언트 툴"
+      servers:
+        - url: https://api.nicepay.co.kr
+          description: 약관 조회는 운영 환경에서만 가능
+      parameters:
+        - name: termsType
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 50
+            enum:
+              - ElectronicFinancialTransactions
+              - CollectPersonalInfo
+              - SharingPersonalInformation
+              - TelecommunicationCharging
+          description: |
+            (필수) 조회할 약관 유형을 지정합니다.
+            - `ElectronicFinancialTransactions`: 전자금융거래 약관
+            - `CollectPersonalInfo`: 개인정보 수집 및 이용 약관
+            - `SharingPersonalInformation`: 개인정보 제 3자 제공약관
+            - `TelecommunicationCharging`: 통신과금서비스 이용약관
+        - name: returnCharSet
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+            default: "utf-8"
+          description: "(옵션) 응답 파라미터 인코딩 방식"
+      responses:
+        '200':
+          description: 약관 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TermsResponse'
+
+  /v1/card/event:
+    get:
+      summary: "[조회] 카드 이벤트(포인트, 무이자) 정보 조회"
+      description: |
+        **[GET 요청] 카드 포인트/무이자 이벤트 정보 조회하는 API**
+
+        **이 API는 샌드박스 환경을 지원하지 않으며, 운영 환경(`https://api.nicepay.co.kr`)에서만 호출 가능**
+        
+        - HTTP Method: `GET`
+        - Path: `/v1/card/event`
+        - Query Params: amount, useAuth, ediDate, mid, signData, returnCharSet
+
+        모델은 이 정보 바탕으로 사용자가 요청한 언어에 맞는 **GET 방식 코드** 생성해야 하며,
+        **테스트 시 반드시 운영 서버 주소 사용 필요**
+      operationId: get_card_promotions
+      tags:
+        - "조회"
+      x-mcp-client-tool:
+        method: GET
+        description: "운영 환경에서 카드 이벤트 조회하는 GET 방식 클라이언트 툴"
+      servers:
+        - url: https://api.nicepay.co.kr
+          description: 카드 이벤트 조회는 운영 환경에서만 가능
+      parameters:
+        - name: amount
+          in: query
+          required: false
+          schema:
+            type: integer
+            example: 50000
+          description: "(옵션) 기준 금액. 이 금액에 해당하는 카드 이벤트 정보 제공 최대 12바이트"
+        - name: useAuth
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: "(옵션) 인증 거래 여부 (true: 인증, false: 비인증/빌링)"
+        - name: ediDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: "(옵션) 전문생성일시 (ISO 8601 형식)"
+        - name: mid
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+          description: "(옵션) 상점 MID. 일반적으로 사용하지 않으나, 요청 시 최우선으로 적용"
+        - name: signData
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 256
+          description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(ediDate + SecretKey))"
+        - name: returnCharSet
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+            default: "utf-8"
+          description: "(옵션) 응답 파라미터 인코딩 방식"
+      responses:
+        '200':
+          description: 카드 이벤트 정보 조회 성공.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardEventResponse'
+
+  /v1/card/interest-free:
+    get:
+      summary: "[조회] 카드 무이자 할부 정보 조회"
+      description: |
+        **[GET 요청] 이 툴은 현재 진행 중인 모든 카드 무이자 할부 이벤트 정보 조회**
+
+        - HTTP Method: `GET`
+        - Path: `/v1/card/interest-free`
+
+        모델은 이 정보 바탕으로, 사용자가 요청하는 언어에 맞는 **GET 방식 클라이언트 코드 생성**
+      operationId: list_interest_free_installments
+      tags:
+        - "조회"
+      x-mcp-client-tool:
+        method: GET
+        description: "진행 중인 카드 무이자 이벤트 조회하는 GET 방식 클라이언트 툴"
+      parameters:
+        - name: useAuth
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: "(옵션) 인증 거래 여부 (true: 인증, false: 비인증/빌링)"
+        - name: ediDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: "(옵션) 전문생성일시 (ISO 8601 형식)"
+        - name: mid
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+          description: "(옵션) 상점 MID. 일반적으로 사용하지 않으나, 요청 시 최우선으로 적용"
+        - name: signData
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 256
+          description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(ediDate + SecretKey))"
+        - name: returnCharSet
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 10
+            default: "utf-8"
+          description: "(옵션) 응답 파라미터 인코딩 방식"
+      responses:
+        '200':
+          description: 카드 무이자 정보 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InterestFreeResponse'
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: |
+        HTTP 기본 인증. 값은 `clientId:secretKey`를 Base64로 인코딩한 문자열
+
+  callbacks:
+    PaymentAuthCallback:
+      '{$request.body#/returnUrl}':
+        post:
+          summary: 클라이언트 인증 결과 콜백
+          description: 결제창 인증이 완료되면, NICEPAY 서버가 이 URL로 인증 결과 POST
+          requestBody:
+            description: 인증 결과는 `application/x-www-form-urlencoded` 형식으로 전달
+            required: true
+            content:
+              application/x-www-form-urlencoded:
+                schema:
+                  $ref: '#/components/schemas/ClientAuthResponse'
+          responses:
+            '200':
+              description: 가맹점 서버는 이 요청을 받고 `OK` 또는 `SUCCESS`와 같은 문자열로 응답 필요
+
+  schemas:
+    # 요청 스키마
+    PaymentWindowRequest:
+      type: object
+      required: [clientId, method, orderId, amount, goodsName, returnUrl]
+      properties:
+        # ==================== 공통 파라미터 ====================
+        clientId: { type: string, maxLength: 50, description: "(필수) 가맹점 식별코드로, NICEPAY에서 발급한 고유 값" }
+        method: { type: string, maxLength: 20, description: "(필수) 사용할 결제수단을 지정 예: 'card', 'vbank', 'kakaopay'", enum: [card, bank, directCard, vbank, cellphone, naverpayCard, kakaopay, kakaopayCard, kakaopayMoney, samsungpayCard, payco, ssgpay, cardAndEasyPay] }
+        orderId: { type: string, maxLength: 64, description: "(필수) 가맹점에서 관리하는 유니크한 주문번호. 이미 결제된 주문번호 재사용 불가" }
+        amount: { type: number, description: "(필수) 결제할 총 금액. 숫자만 입력" }
+        goodsName: { type: string, maxLength: 40, description: "(필수) 결제창에 표시될 상품명. '\"'와 '¦' 특수문자는 '-'로 자동 대체됨" }
+        returnUrl: { type: string, maxLength: 500, description: "(필수) 결제 인증 완료 후, NICEPAY가 결과 전달할 가맹점 서버 URL" }
+        mallReserved: { type: string, maxLength: 500, description: "상점 추가 정보 전달하는 예비 필드. returnUrl로 함께 반환되며, JSON 문자열 형식 사용을 권장" }
+        mallUserId: { type: string, maxLength: 20, description: "상점에서 관리하는 사용자 ID" }
+        buyerName: { type: string, maxLength: 30, description: "구매자 실명" }
+        buyerTel: { type: string, maxLength: 40, description: "구매자 연락처 하이픈(-) 없이 숫자만 입력" }
+        buyerEmail: { type: string, maxLength: 60, description: "구매자 이메일 주소" }
+        useEscrow: { type: boolean, description: "에스크로 거래 여부 설정 (true: 에스크로, false: 일반거래)" }
+        currency: { type: string, maxLength: 3, description: "결제 통화 단위 설정 (KRW, USD, CNY)" }
+        logoImgUrl: { type: string, maxLength: 100, description: "결제창 상단 가맹점 로고 이미지 전체 URL" }
+        language: { type: string, maxLength: 2, description: "결제창 언어 설정 (KO, EN, CN)" }
+        returnCharSet: { type: string, maxLength: 10, description: "returnUrl로 전달될 파라미터 인코딩 방식 (utf-8, euc-kr)" }
+        skinType: { type: string, maxLength: 10, description: "결제창 스킨 색상을 설정 (red, green, purple, gray, dark)" }
+        
+        # ==================== 부가세 지정 ====================
+        taxFreeAmt: { type: number, description: "결제 금액(amount) 중 면세에 해당하는 금액을 설정" }
+        
+        # ==================== 신용카드 & 간편결제 ====================
+        cardQuota: { type: string, maxLength: 100, description: "사용 가능한 할부개월을 제한 콤마(,)로 구분하며, 일시불은 '00'으로 설정 (예: '00,03,06')" }
+        cardCode: { type: string, maxLength: 100, description: "결제창에 노출할 특정 카드사 코드로 제한 콤마(,)로 구분 (예: '04,06')" }
+        cardShowOpt: { type: string, maxLength: 50, description: "카드사별 인증창 호출방식을 직접 지정 (예: '08:3¦02:3')" }
+
+        # ==================== 가상계좌 ====================
+        vbankHolder: { type: string, maxLength: 40, description: "가상계좌 발급 시 입금주로 표시될 이름 (가상계좌 결제 시 필수)" }
+        vbankValidHours: { type: number, description: "가상계좌 입금 유효시간을 시간 단위로 설정" }
+        vbankExpDate: { type: string, description: "가상계좌 입금 만료일을 'YYYYMMDDhhmm' 형식으로 직접 지정" }
+        
+        # ==================== 휴대폰 ====================
+        isDigital: { type: boolean, description: "휴대폰 결제 상품 유형을 설정 (true: 컨텐츠, false: 실물)" }
+        
+        # ==================== 다이렉트 (현금영수증) ====================
+        directReceiptType: { type: string, maxLength: 20, description: "현금영수증 발급 유형을 지정 (unPublished, individual, company)" }
+        directReceiptNo: { type: string, maxLength: 20, description: "현금영수증 발행 대상 식별정보(휴대폰 또는 사업자번호). '-'없이 숫자만 입력" }
+
+        # ==================== PC 옵션 ====================
+        disableScroll: { type: boolean, description: "결제창 스크롤 생성 여부 설정 (기본값: true, 스크롤 없음)" }
+        disableEdgeChk: { type: boolean, description: "Edge 브라우저 사용 시 안내 팝업 노출 여부 설정 (기본값: false, 노출)" }
+        zIdxHigher: { type: boolean, description: "결제창 레이어 z-index 11000으로 상향 조정" }
+        
+        # ==================== Mobile 옵션 ====================
+        appScheme: { type: string, maxLength: 200, description: "모바일 앱 결제 후 다시 앱으로 돌아오기 위한 App Scheme 값을 설정" }  
+    
+    ApprovalRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+          description: "(필수) 결제금액, 최대 12바이트"
+          example: 1004
+        ediDate:
+          type: string
+          description: "(옵션) 전문생성일시 ISO 8601 형식 (예: 2025-06-30T21:00:00+09:00)."
+          format: date-time
+        signData:
+          type: string
+          maxLength: 256
+          description: "(옵션) 위변조 검증 데이터 생성규칙: hex(sha256(tid + amount + ediDate + SecretKey))."
+        returnCharSet:
+          type: string
+          maxLength: 10
+          description: "(옵션) 응답 파라미터 인코딩 방식. (기본값: utf-8)"
+          enum: ["utf-8", "euc-kr"]
+          default: "utf-8"
+
+    CancelRequest:
+      type: object
+      properties:
+        reason: { type: string, maxLength: 100, description: "(옵션) 취소 사유" }
+        orderId: { type: string, maxLength: 64, description: "(옵션) 상점 거래 고유번호. 부분 취소 시에는 중복된 orderId로 재호 불가" }
+        cancelAmt: { type: integer, description: "(옵션) 부분 취소 요청 금액. 값이 없으면 전액 취소 처리" }
+        mallReserved: { type: string, maxLength: 500, description: "(옵션) 상점 정보 전달용 예비 필드" }
+        ediDate: { type: string, description: "(옵션) 전문생성일시 (ISO 8601 형식)" }
+        signData: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(tid + ediDate + SecretKey))" }
+        returnCharSet: { type: string, maxLength: 10, description: "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)", default: "utf-8" }
+        taxFreeAmt: { type: integer, description: "(옵션) 취소 금액 중 면세 공급가액" }
+        refundAccount: { type: string, maxLength: 16, description: "(옵션) 환불 계좌번호" }
+        refundBankCode: { type: string, maxLength: 3, description: "(옵션) 환불 계좌 은행코드" }
+        refundHolder: { type: string, maxLength: 10, description: "(옵션) 환불 계좌 예금주명" }
+
+    BillingKeyRegistrationRequest:
+      type: object
+      required: [encData, orderId]
+      properties:
+        encData:
+          type: string
+          maxLength: 512
+          description: |
+            (필수) 결제정보 암호화한 데이터
+            **암호화 방식 (encMode: 'A2' 기준):**
+            - **알고리즘**: AES-256-CBC
+            - **KEY**: 가맹점 SecretKey (32byte)
+            - **IV**: 가맹점 SecretKey 앞 16자리
+            - **Padding**: PKCS5
+            - **결과 인코딩**: Hex
+            **평문(Plain Text) 형식:**
+            `cardNo=값&expYear=YY&expMonth=MM&idNo=값&cardPw=값`
+            (상세 내용은 BillingKeyData 스키마 참조)
+        orderId:
+          type: string
+          maxLength: 64
+          description: "(필수) 가맹점에서 관리하는 유니크한 주문번호"
+        buyerName:
+          type: string
+          maxLength: 30
+          description: "(옵션) 구매자 이름"
+        buyerEmail:
+          type: string
+          maxLength: 60
+          description: "(옵션) 구매자 이메일 주소"
+        buyerTel:
+          type: string
+          maxLength: 20
+          description: "(옵션) 구매자 전화번호 ('-' 없이 숫자만)"
+        encMode:
+          type: string
+          maxLength: 10
+          description: "(옵션) 암호화 모드. 'A2'는 AES256 의미"
+          default: "A2"
+          enum: ["A2"]
+        ediDate:
+          type: string
+          description: "(옵션) 전문생성일시 (ISO 8601 형식)"
+        signData:
+          type: string
+          maxLength: 256
+          description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + ediDate + SecretKey))"
+        returnCharSet:
+          type: string
+          maxLength: 10
+          description: "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)"
+          default: "utf-8"
+
+    BillingKeyData:
+      type: object
+      description: "encData 필드 암호화하기 위한 평문(Plain Text) 데이터 구조"
+      required: [cardNo, expYear, expMonth, idNo, cardPw]
+      properties:
+        cardNo: { type: string, maxLength: 16, description: "(필수) 카드번호 (숫자만)" }
+        expYear: { type: string, maxLength: 2, description: "(필수) 유효기간 년 (YY 형식)" }
+        expMonth: { type: string, maxLength: 2, description: "(필수) 유효기간 월 (MM 형식)" }
+        idNo: { type: string, maxLength: 13, description: "(필수) 개인: 생년월일 6자리 (YYMMDD) / 법인: 사업자번호 10자리" }
+        cardPw: { type: string, maxLength: 2, description: "(필수) 카드 비밀번호 앞 2자리" }
+
+    BillingApprovalRequest:
+      type: object
+      required: [orderId, amount, goodsName, cardQuota, useShopInterest]
+      properties:
+        orderId: { type: string, maxLength: 64, description: "(필수) 가맹점에서 관리하는 유니크한 주문번호. 결제된 주문번호로는 재호출 불가" }
+        amount: { type: integer, description: "(필수) 결제할 금액. 최대 12바이트" }
+        goodsName: { type: string, maxLength: 40, description: "(필수) 상품명" }
+        cardQuota: { type: string, maxLength: 2, description: "(필수) 할부개월 0:일시불, 2:2개월..." }
+        useShopInterest: { type: boolean, description: "(필수) 상점분담무이자 사용 여부 (현재 false만 사용 가능)" }
+        buyerName: { type: string, maxLength: 30, description: "(옵션) 구매자 이름" }
+        buyerTel: { type: string, maxLength: 20, description: "(옵션) 구매자 전화번호 ('-' 없이 숫자만)" }
+        buyerEmail: { type: string, maxLength: 60, description: "(옵션) 구매자 이메일" }
+        taxFreeAmt: { type: integer, description: "(옵션) 면세 공급가액. 전체 거래금액 중 면세 금액을 설정" }
+        mallReserved: { type: string, maxLength: 500, description: "(옵션) 상점 정보 전달용 예비 필드" }
+        ediDate: { type: string, description: "(옵션) 전문생성일시 (ISO 8601 형식)" }
+        signData: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + bid + ediDate + SecretKey))" }
+        returnCharSet: { type: string, maxLength: 10, description: "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)", default: "utf-8" }
+
+    BillingKeyExpireRequest:
+      type: object
+      properties:
+        orderId:
+          type: string
+          maxLength: 64
+          description: "(옵션) 상점 거래 고유번호"
+        ediDate:
+          type: string
+          description: "(옵션) 전문생성일시 (ISO 8601 형식)"
+        signData:
+          type: string
+          maxLength: 256
+          description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + bid + ediDate + SecretKey))"
+        returnCharSet:
+          type: string
+          maxLength: 10
+          description: "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)"
+          default: "utf-8"
+
+    CashReceiptRequest:
+      type: object
+      required: [orderId, amount, goodsName, receiptType, receiptNo]
+      properties:
+        orderId: { type: string, maxLength: 64, description: "(필수) 상점 거래 고유번호" }
+        amount: { type: integer, description: "(필수) 현금영수증 발행 금액 (최대 12바이트)" }
+        goodsName: { type: string, maxLength: 40, description: "(필수) 상품명" }
+        receiptType: { type: string, maxLength: 20, description: "(필수) 현금영수증 발급 유형", enum: [individual, company] }
+        receiptNo: { type: string, maxLength: 20, description: "(필수) 현금영수증 발행대상 식별정보 (휴대폰번호 또는 사업자번호)" }
+        supplyAmt: { type: integer, description: "(옵션) 공급가액 (최대 12바이트)" }
+        goodsVat: { type: integer, description: "(옵션) 부가가치세 (최대 12바이트)" }
+        taxFreeAmt: { type: integer, description: "(옵션) 면세공급가액 (최대 12바이트)" }
+        serviceAmt: { type: integer, description: "(옵션) 봉사료 (최대 12바이트)" }
+        buyerName: { type: string, maxLength: 30, description: "(옵션) 구매자 이름" }
+        buyerTel: { type: string, maxLength: 40, description: "(옵션) 구매자 전화번호 ('-' 없이)" }
+        buyerEmail: { type: string, maxLength: 60, description: "(옵션) 구매자 이메일" }
+        ediDate: { type: string, description: "(옵션) 전문생성일시 (ISO 8601 형식)" }
+        signData: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + amount + ediDate + SecretKey))" }
+        returnCharSet: { type: string, maxLength: 10, description: "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)", default: "utf-8" }
+
+    CashReceiptCancelRequest:
+      type: object
+      properties:
+        orderId: { type: string, maxLength: 64, description: "(옵션) 상점 거래 고유번호" }
+        reason: { type: string, maxLength: 100, description: "(옵션) 취소 사유" }
+        cancelAmt: { type: integer, description: "(옵션) 부분 취소 요청 금액. 값이 없으면 전액 취소로 처리 부분 취소 시 하위 금액 필드(supplyAmt 등)는 필수" }
+        ediDate: { type: string, description: "(옵션) 전문생성일시 (ISO 8601 형식)" }
+        signData: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터 생성규칙: hex(sha256(tid + ediDate + SecretKey))" }
+        returnCharSet: { type: string, maxLength: 10, description: "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)", default: "utf-8" }
+        supplyAmt: { type: integer, description: "(부분 취소 시 필수) 취소 금액 중 공급가액" }
+        goodsVat: { type: integer, description: "(부분 취소 시 필수) 취소 금액 중 부가가치세" }
+        taxFreeAmt: { type: integer, description: "(부분 취소 시 필수) 취소 금액 중 면세 공급가액" }
+        serviceAmt: { type: integer, description: "(부분 취소 시 필수) 취소 금액 중 봉사료" }
+
+    #==================================================================
+    # 응답 객체 및 상세 정보 스키마
+    #==================================================================
+    PaymentResponse:
+      type: object
+      description: "결제 승인 API 최종 응답 객체"
+      properties:
+        resultCode:
+          $ref: '#/components/schemas/ResultCode'
+        resultMsg:
+          type: string
+          description: "결제결과메시지"
+        tid:
+          type: string
+          description: "결제 승인 키"
+        cancelledTid:
+          type: string
+          description: "취소 거래 키 (취소 요청건에 한하여 응답됨)"
+        orderId:
+          type: string
+          description: "상점 거래 고유번호"
+        ediDate:
+          type: string
+          format: date-time
+          description: "응답전문생성일시 (ISO 8601 형식)"
+        signature:
+          type: string
+          description: "위변조 검증 데이터. hex(sha256(tid + amount + ediDate+ SecretKey))"
+        status:
+          type: string
+          enum: [paid, ready, failed, cancelled, partialCancelled, expired]
+          description: "결제 처리상태"
+        paidAt:
+          type: string
+          format: date-time
+          description: "결제완료시점 (ISO 8601 형식)"
+        failedAt:
+          type: string
+          format: date-time
+          description: "결제실패시점 (ISO 8601 형식)"
+        cancelledAt:
+          type: string
+          format: date-time
+          description: "결제취소시점 (ISO 8601 형식)"
+        payMethod:
+          type: string
+          enum: [card, vbank, naverpay, kakaopay, payco, ssgpay, samsungpay]
+          description: "결제수단"
+        amount:
+          type: integer
+          description: "결제 금액"
+        balanceAmt:
+          type: integer
+          description: "취소 가능 잔액"
+        goodsName:
+          type: string
+          description: "상품명"
+        mallReserved:
+          type: string
+          description: "상점 정보 전달용 예비필드"
+        useEscrow:
+          type: boolean
+          description: "에스크로 거래 여부"
+        currency:
+          type: string
+          description: "결제승인화폐단위 (e.g., KRW)"
+        channel:
+          type: string
+          enum: [pc, mobile, null]
+          description: "결제 채널"
+        approveNo:
+          type: string
+          description: "제휴사 승인 번호"
+        buyerName:
+          type: string
+          description: "구매자 명"
+        buyerTel:
+          type: string
+          description: "구매자 전화번호"
+        buyerEmail:
+          type: string
+          description: "구매자 이메일"
+        issuedCashReceipt:
+          type: boolean
+          description: "현금영수증 발급여부"
+        receiptUrl:
+          type: string
+          description: "매출전표 확인 URL"
+        mallUserId:
+          type: string
+          description: "상점에서 관리하는 사용자 아이디"
+        coupon:
+          $ref: '#/components/schemas/CouponInfo'
+        card:
+          $ref: '#/components/schemas/CardInfo'
+        cashReceipts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CashReceiptInfo'
+        bank:
+          $ref: '#/components/schemas/BankInfo'
+        vbank:
+          $ref: '#/components/schemas/VBankInfo'
+
+    ClientAuthResponse:
+      type: object
+      description: "결제창 인증 완료 후 returnUrl로 전달되는 파라미터 명세."
+      properties:
+        authResultCode: { type: string, maxLength: 4, description: "(필수) 인증결과 코드. '0000'이면 인증 성공" }
+        authResultMsg: { type: string, maxLength: 500, description: "(필수) 인증결과 메시지" }
+        tid: { type: string, maxLength: 30, description: "(인증 성공 시 필수) 결제 승인을 위한 고유한 거래 키(key)" }
+        clientId: { type: string, maxLength: 50, description: "(필수) 요청 시 전달했던 가맹점 식별코드" }
+        orderId: { type: string, maxLength: 64, description: "(필수) 요청 시 전달했던 상점 거래 고유번호" }
+        amount: { type: integer, description: "(필수) 요청 시 전달했던 결제 금액" }
+        mallReserved: { type: string, maxLength: 500, description: "요청 시 전달했던 상점 예약필드" }
+        authToken: { type: string, maxLength: 40, description: "(필수) 인증 과정을 위한 고유 토큰" }
+        signature: { type: string, maxLength: 256, description: "(인증 성공 시 필수) 위변조 검증 데이터. 생성규칙: hex(sha256(authToken + clientId + amount + SecretKey))" }
+
+    BillingKeyRegistrationResponse:
+      type: object
+      description: "빌키 발급 API 응답 객체"
+      required: [ResultCode, ResultMsg, TID, OrderID, BID, AuthDate, CardCode, CardName]
+      properties:
+        ResultCode:
+          $ref: '#/components/schemas/ResultCode'
+        ResultMsg:
+          type: string
+          maxLength: 100
+          description: "(필수) 결제결과메시지 예시: 빌키가 정상적으로 생성되었습니다"
+        TID:
+          type: string
+          maxLength: 30
+          description: "(필수) 거래번호 빌키 발급 거래 식별하는 Transaction ID"
+        OrderID:
+          type: string
+          maxLength: 64
+          description: "(필수) 상점 거래 고유번호"
+        BID:
+          type: string
+          maxLength: 30
+          description: "(필수) 빌키. NICEPAY가 발급하는 고유한 빌링 아이디"
+        AuthDate:
+          type: string
+          description: "(필수) 인증일자 (ISO 8601 형식)"
+          format: date-time
+        CardCode:
+          $ref: '#/components/schemas/CardCode'
+        CardName:
+          type: string
+          maxLength: 20
+          description: "(필수) 카드사 이름. 예시: [삼성]"
+
+    BillingKeyExpireResponse:
+      type: object
+      description: "빌키 삭제 API 응답 객체"
+      required: [resultCode, resultMsg, tid, orderId, bid, authDate]
+      properties:
+        resultCode:
+          type: string
+          maxLength: 4
+          description: "(필수) 결제결과코드. '0000'이면 성공"
+        resultMsg:
+          type: string
+          maxLength: 100
+          description: "(필수) 결제결과메시지. 예시: 정상 처리되었습니다."
+        tid:
+          type: string
+          maxLength: 30
+          description: "(필수) 빌키 삭제 거래 식별하는 Transaction ID"
+        orderId:
+          type: string
+          maxLength: 64
+          description: "(필수) 상점 거래 고유번호"
+        bid:
+          type: string
+          maxLength: 30
+          description: "(필수) 삭제 처리된 빌링키"
+        authDate:
+          type: string
+          description: "(필수) 처리 성공 시 반환되는 인증일자 (ISO 8601 형식)"
+          format: date-time
+
+    CashReceiptResponse:
+      type: object
+      description: "현금영수증 발급 API 응답 객체"
+      required: [resultCode, resultMsg, tid, orderId]
+      properties:
+        resultCode: { type: string, maxLength: 4, description: "(필수) 결과코드. '0000'이면 성공" }
+        resultMsg: { type: string, maxLength: 100, description: "(필수) 결과메시지" }
+        tid: { type: string, maxLength: 30, description: "(필수) NICEPAY 거래키" }
+        orderId: { type: string, maxLength: 64, description: "(필수) 상점 거래 고유번호." }
+        approvedAt: { type: string, description: "(옵션) 발급 시점 (ISO 8601 형식). 발급 완료 시에만 응답" }
+        approveNo: { type: string, maxLength: 30, description: "(옵션) 현금영수증 국세청 발행번호. 발급 성공 시에만 응답" }
+        ediDate: { type: string, maxLength: 14, description: "(필수) 응답 전문생성일시 (ISO 8601 형식)" }
+        signature: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터. 유효한 거래건에 한하여 응답" }
+
+    CashReceiptCancelResponse:
+      type: object
+      description: "현금영수증 취소 API 응답 객체"
+      required: [resultCode, resultMsg, tid, orderId, cancelAmt, balanceAmt, cancelledAt, ediDate]
+      properties:
+        resultCode: { type: string, maxLength: 4, description: "(필수) 결과코드. '0000'이면 성공" }
+        resultMsg: { type: string, maxLength: 100, description: "(필수) 결과메시지" }
+        tid: { type: string, maxLength: 30, description: "(필수) 취소 거래 새로운 NICEPAY 거래키" }
+        orderId: { type: string, maxLength: 64, description: "(필수) 상점 거래 고유번호" }
+        cancelAmt: { type: integer, description: "(필수) 취소된 금액. 취소 실패 시 0" }
+        balanceAmt: { type: integer, description: "(필수) 취소 가능한 잔액" }
+        cancelledAt: { type: string, description: "(필수) 취소 시점 (ISO 8601 형식). 취소 실패 시 0" }
+        approveNo: { type: string, maxLength: 30, description: "(옵션) 현금영수증 국세청 취소 승인번호. 취소 성공 시 리턴" }
+        ediDate: { type: string, maxLength: 14, description: "(필수) 응답 전문생성일시 (ISO 8601 형식)." }
+        signature: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터. 유효한 거래건에 한하여 응답" }
+
+    CashReceiptQueryResponse:
+      type: object
+      description: "현금영수증 조회 API 응답 객체"
+      required: [resultCode, resultMsg, tid, orderId, ediDate]
+      properties:
+        resultCode: { type: string, maxLength: 4, description: "(필수) 결과코드. '0000'이면 성공" }
+        resultMsg: { type: string, maxLength: 100, description: "(필수) 결과메시지" }
+        tid: { type: string, maxLength: 30, description: "(필수) NICEPAY 거래키" }
+        orderId: { type: string, maxLength: 64, description: "(필수) 상점 거래 고유번호" }
+        approveNo: { type: string, maxLength: 30, description: "(옵션) 현금영수증 국세청 승인번호. 발급 성공 시 리턴됩니다" }
+        ediDate: { type: string, maxLength: 14, description: "(필수) 응답 전문생성일시 (ISO 8601 형식)" }
+        signature: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터. 유효한 거래건에 한하여 응답됩니다" }
+
+    TermsResponse:
+      type: object
+      description: "약관 조회 API 응답 객체"
+      required: [resultCode, resultMsg, termsTitle, content]
+      properties:
+        resultCode:
+          type: string
+          maxLength: 4
+          description: "(필수) 결과코드. '0000'이면 성공을 의미"
+        resultMsg:
+          type: string
+          maxLength: 100
+          description: "(필수) 결과메시지"
+        termsTitle:
+          type: string
+          maxLength: 100
+          description: "(필수) 조회된 약관 제목"
+        content:
+          type: string
+          maxLength: 30000
+          description: "(필수) 조회된 약관 전체 내용"
+
+    CardEventResponse:
+      type: object
+      description: "카드 이벤트 조회 API 응답 객체"
+      required: [resultCode, resultMsg]
+      properties:
+        resultCode: { $ref: '#/components/schemas/ResultCode' }
+        resultMsg: { type: string, maxLength: 100, description: "(필수) 결과메시지" }
+        ediDate: { type: string, description: "(옵션) 응답전문생성일시 (ISO 8601 형식)", format: "date-time" }
+        signature: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터 생성규칙: hex(sha256(ediDate + SecretKey))" }
+        cardPoint: { type: string, description: "(옵션) 포인트 결제 지원 카드사 코드 목록 (콜론 ':' 구분)" }
+        interestFree:
+          type: array
+          description: "(옵션) 제공되는 모든 무이자 할부 정보"
+          items:
+            $ref: '#/components/schemas/InterestFreeInfo'
+
+
+    InterestFreeResponse:
+      type: object
+      description: "카드 무이자 조회 API 응답 객체"
+      required: [resultCode, resultMsg]
+      properties:
+        resultCode: { $ref: '#/components/schemas/ResultCode' }
+        resultMsg: { type: string, maxLength: 100, description: "(필수) 결과메시지" }
+        ediDate: { type: string, description: "(옵션) 응답전문생성일시 (ISO 8601 형식)", format: "date-time" }
+        signature: { type: string, maxLength: 256, description: "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(ediDate + SecretKey))" }
+        interestFree:
+          type: array
+          description: "(필수) 제공되는 모든 무이자 할부 정보 배열"
+          items:
+            $ref: '#/components/schemas/InterestFreeInfo'
+
+    InterestFreeInfo:
+      type: object
+      description: "카드사별 무이자 할부 정보 객체"
+      required: [cardCode, cardName, freeInstallment]
+      properties:
+        cardCode: { $ref: '#/components/schemas/CardCode' }
+        cardName: { type: string, maxLength: 20, description: "(필수) 카드사 이름" }
+        freeInstallment:
+          type: array
+          description: "(필수) 무이자 할부 상세 정보 배열"
+          items:
+            $ref: '#/components/schemas/InstallmentDetail'
+
+    InstallmentDetail:
+      type: object
+      description: "할부 개월에 따른 상세 조건 객체"
+      required: [minAmt, maxAmt, installment]
+      properties:
+        minAmt:
+          type: integer
+          description: "(필수) 이벤트 적용 최소 금액"
+        maxAmt:
+          type: integer
+          description: "(필수) 이벤트 적용 최대 금액"
+        installment:
+          type: string
+          maxLength: 100
+          description: "(필수) 무이자 할부개월 목록 (콜론 ':' 구분). 예: '02:03:04:05'"
+        eventToDate:
+          type: string
+          description: "(옵션) 이벤트 제공 기한 (ISO 8601 형식)"
+          format: "date-time"
+
+    CouponInfo:
+      type: object
+      description: "즉시할인 프로모션 정보"
+      properties:
+        couponAmt:
+          type: integer
+          description: "즉시할인 적용된 금액"
+
+    CardInfo:
+      type: object
+      description: "신용카드 정보"
+      properties:
+        cardCode:
+          $ref: '#/components/schemas/CardCode'
+        cardName:
+          type: string
+          description: "결제 카드사 이름"
+        cardNum:
+          type: string
+          description: "마스킹 처리된 카드번호"
+        cardQuota:
+          type: string
+          description: "할부개월 (0: 일시불)"
+        isInterestFree:
+          type: boolean
+          description: "상점분담무이자 여부"
+        cardType:
+          type: string
+          description: "카드 구분 (credit or check)"
+        canPartCancel:
+          type: string
+          description: "부분취소 가능 여부 (true or false)"
+        acquCardCode:
+          type: string
+          description: "매입카드사코드"
+        acquCardName:
+          type: string
+          description: "매입카드사명"
+
+    CashReceiptInfo:
+      type: object
+      description: "현금영수증 발급정보"
+      properties:
+        receiptTid:
+          type: string
+          description: "현금영수증 TID"
+        orgTid:
+          type: string
+          description: "연관된 원 승인/취소 거래 TID"
+        status:
+          type: string
+          description: "발급진행 상태"
+        amount:
+          type: integer
+          description: "현금영수증 발행 총금액"
+        taxFreeAmt:
+          type: integer
+          description: "현금영수증 전체 금액 중 면세금액"
+        receiptType:
+          type: string
+          enum: [individual, company]
+          description: "현금영수증 타입 (개인 or 사업자)"
+        issueNo:
+          type: string
+          description: "현금영수증 국세청 발행번호"
+        receiptUrl:
+          type: string
+          description: "현금영수증 매출전표 확인 URL"
+
+    BankInfo:
+      type: object
+      description: "계좌이체 은행 정보"
+      properties:
+        bankCode:
+          $ref: '#/components/schemas/BankCode'
+        bankName:
+          type: string
+          description: "결제은행명."
+
+    VBankInfo:
+      type: object
+      description: "가상계좌 정보"
+      properties:
+        vbankCode:
+          $ref: '#/components/schemas/BankCode'
+        vbankName:
+          type: string
+          description: "입금받을 가상계좌 은행명"
+        vbankNumber:
+          type: string
+          description: "입금받을 가상계좌 번호"
+        vbankExpDate:
+          type: string
+          format: date-time
+          description: "가상계좌 입금 만료일 (ISO 8601)"
+        vbankHolder:
+          type: string
+          description: "입금받을 가상계좌 예금주명"
+
+    #==================================================================
+    # 코드 정의 스키마 (Code Definition Schemas)
+    #==================================================================
+    ResultCode:
+      type: string
+      description: |
+        API 응답 코드와 메시지입니다.
+        - `3001`: 카드 결제 성공
+        - `3011`: 카드번호 오류
+        - `3012`: 카드가맹점 정보 미확인
+        - `3013`: 카드 가맹점 개시 안됨
+        - `3014`: 카드가맹점 정보 오류
+        - `3021`: 유효기간 오류
+        - `3022`: 할부개월오류
+        - `3023`: 할부개월 한도 초과
+        - `3024`: 할부 최소금액 오류(50000미만)
+        - `3031`: 무이자할부 카드 아님
+        - `3032`: 무이자할부 불가 개월수
+        - `3033`: 무이자할부 가맹점 아님
+        - `3034`: 무이자할부 구분 미설정
+        - `3041`: 금액 오류(1000원 미만 신용카드 승인 불가)
+        - `3051`: 해외카드 미등록 가맹점
+        - `3052`: 통화코드 오류
+        - `3053`: 확인 불가 해외카드
+        - `3054`: 환률전환오류
+        - `3055`: 인증시 달러승인 불가
+        - `3056`: 국내카드 달러승인불가
+        - `3057`: 인증 불가카드
+        - `3061`: 국민카드 인터넷안전결제 적용 가맹점
+        - `3062`: 신용카드 승인번호 오류
+        - `3071`: 매입요청 가맹점 아님
+        - `3072`: 매입요청 TID 정보 불일치
+        - `3073`: 기매입 거래
+        - `3081`: 카드 잔액 값 오류
+        - `3091`: 제휴카드 사용불가 가맹점
+        - `3095`: 카드사 실패 응답
+        - `4000`: 계좌이체 결제 성공
+        - `4001`: 금결원오류응답
+        - `4002`: 회원사 서비스 불가 은행
+        - `4003`: 출금일자 불일치
+        - `4004`: 출금요청금액 불일치
+        - `4005`: 거래번호(TID) 불일치
+        - `4006`: 회신 정보 불일치
+        - `4007`: 계좌이체 승인번호 오류
+        - `4008`: 은행 시스템 서비스 중단
+        - `4100`: 가상계좌 발급 성공
+        - `4110`: 가상계좌 입금 성공
+        - `4120`: 가상계좌 과오납체크 등록 성공
+        - `4101`: 가상계좌 최대거래금액 초과
+        - `4102`: 가상계좌 입금예정일 오류
+        - `4103`: 가상계좌 입금예정시간 오류
+        - `4104`: 가상계좌 정보 오류
+        - `4105`: 가상계좌 벌크계좌 사용불가.(건별계좌 사용 가맹점)
+        - `4106`: 가상계좌 벌크계좌 사용불가.(벌크계좌 사용 가맹점)
+        - `4107`: 가상계좌 계좌번호 미입력 오류
+        - `4108`: 가상계좌 Pool 가맹점 미등록 오류
+        - `4109`: 해당 계좌는 입금대기상태(다른 계좌 사용요망)
+        - `4111`: 가상계좌 Pool 가맹점 계좌형태 설정 오류
+        - `4112`: 벌크계좌의 경우 장바구니 개수를 10개 이내로 제한
+        - `4113`: 장바구니 상점주문번호(MOID) 포맷 오류 (MID(10)+YYMMDD(6)+일련번호(4))
+        - `4114`: 장바구니 상점주문번호(MOID) 포맷 오류 (YYMMDD(6)+일련번호(max_size 14))
+        - `4115`: 해당 계좌번호는 6개월 이내 재사용 금지
+        - `4116`: 가상계좌 계좌번호 채번시도 횟수초과 오류(잠시후 재시도 요망)
+        - `4117`: 가상계좌 발급 실패
+        - `4118`: 계좌번호 사용중지 상태
+        - `4119`: 가상계좌 채번내역 미존재 오류
+        - `4121`: 가상계좌 과오납체크 등록 실패
+        - `4122`: 가상계좌 입금요청 금액 불일치 오류
+        - `4123`: 가상계좌 채번취소(환불) 상태이므로 입금처리 실패
+        - `4124`: 가상계좌 입금내역 기처리 완료
+        - `4125`: 가상계좌 입금만료 제한 설정오류(기준정보)
+        - `4126`: 가상계좌 CPID 설정 오류
+        - `4127`: 가상계좌 CPID 미설정 오류
+        - `4141`: 금액오류(1원 이하 이체불가)
+        - `4142`: 가상계좌 과오납체크 미사용 가맹점
+        - `4143`: 가상계좌 과오납체크 미등록 오류
+        - `4145`: 예금주명 수정이 불가능한 MID
+        - `7001`: 현금영수증 처리 성공
+        - `7002`: 현금영수증 종류오류
+        - `7003`: 현금영수증 중복발급
+        - `7004`: 현금영수증 취소오류
+        - `7005`: 현금영수증 부가가치세 오류
+        - `7006`: 현금영수증 최대개수 초과
+        - `7007`: 현금영수증 요청개수 입력 오류
+        - `7008`: 현금영수증 서브몰 발행 미등록 업체
+        - `7009`: 현금영수증 처리 지불수단이 아닙니다
+        - `7010`: VAN응답실패
+        - `7011`: 현금영수증 미발행 요청입니다
+        - `7012`: 현금영수증 Identity 번호 오류
+        - `7013`: 현금영수증 요청구분 값 오류(1:소득공제, 2:지출증빙)
+        - `7014`: 현금영수증 서브몰 사업자번호로 발행시 필수값 누락
+        - `7015`: 현금영수증 취소시 원승인번호 또는 원거래일자 누락
+        - `7041`: 금액오류(0원 이하 발행불가)
+        - `7042`: 현금영수증 최대금액 초과오류
+        - `A000`: 휴대폰결제 처리 성공
+        - `A001`: 휴대폰결제 처리 실패
+        - `A002`: 필수입력값(거래키) 누락
+        - `A003`: 필수입력값(이통사구분) 누락
+        - `A004`: 필수입력값(SMS승인번호) 누락
+        - `A005`: 필수입력값(업체TID) 누락
+        - `A006`: 필수입력값(휴대폰번호) 누락
+        - `A041`: 결제금액 오류
+        - `A564`: 휴대폰결제ID설정 오류
+        - `A565`: 휴대폰결제ID미설정 오류
+        - `A566`: 휴대폰결제사 설정 오류
+        - `A567`: 상품구분코드 설정 오류
+        - `A568`: 서비스구분코드 설정 오류
+        - `0000`: 결제성공
+        - `1534`: 부분취소 불가능 거래
+        - `1615`: 거래금액 합계오류(공급가액,부가세,봉사료,면세금액 합계)
+        - `2000`: DB오류
+        - `2011`: CINO미존재
+        - `2012`: 주문번호없음
+        - `2032`: 가맹점주문번호길이이상
+        - `2151`: 거래정지 가맹점
+        - `2152`: 미등록가맹점
+        - `2154`: 제휴사상태미확인
+        - `2156`: 중복등록된거래요청
+        - `2157`: 허용되지않는입력방식
+        - `2158`: 중복등록된입력방식
+        - `2159`: 해당은행장애
+        - `2201`: 기승인존재
+        - `F100`: 빌키가 정상적으로 생성되었습니다.
+        - `F101`: 빌링 정보가 정상적으로 삭제되었습니다.
+        - `F102`: 인증서 검증 오류
+        - `F103`: PKCS7 전자서명 검증 실패
+        - `F104`: 인증정보 확인중 오류가 발생하였습니다
+        - `F105`: OCSP인증 중 오류가 발생하였습니다
+        - `F106`: DB 처리중 오류가 발생하였습니다 (TB_TRANS_REQ)
+        - `F107`: DB 처리중 오류가 발생하였습니다 (TB_TRANS)
+        - `F108`: DB 처리중 오류가 발생하였습니다 (TB_TRANS_HISTORY)
+        - `F109`: DB 처리중 오류가 발생하였습니다 (TB_BILL_MASTER)
+        - `F110`: 빌키발급 처리중 오류가 발생하였습니다
+        - `F111`: PKCS7 전자서명 메시지가 존재하지 않습니다
+        - `F112`: 유효하지않은 카드번호를 입력하셨습니다 (card_bin 없음)
+        - `F113`: 본인의 신용카드 확인중 오류가 발생하였습니다
+        - `F114`: 인증서가 유효하지 않습니다
+        - `F115`: 빌키 발급 불가 가맹점입니다.(중지)
+        - `F116`: 빌키 발급 불가 가맹점입니다.(해지)
+        - `F117`: 빌링 미사용 가맹점입니다
+        - `F118`: 해당카드는 사용이 불가능 합니다 타사카드를 이용해주세요
+        - `F200`: 빌링 요청승인이 정상적으로 이루어졌습니다
+        - `F201`: 이미 등록된 카드 입니다(빌키발급실패)
+        - `C000`: 에스크로배송등록 성공
+        - `C002`: 에스크로 가맹점 아님
+        - `C003`: 에스크로 거래만 배송등록 가능
+        - `C004`: 에스크로결제 신청내역 미존재
+        - `C005`: 에스크로배송등록 불가상태
+        - `C006`: 거래내역이 존재하지 않음
+        - `C007`: 취소된 거래는 배송등록 불가
+        - `D000`: 에스크로구매결정 성공
+        - `D002`: 에스크로 가맹점 아님
+        - `D003`: 에스크로 거래만 구매결정 가능
+        - `D004`: 에스크로결제 신청내역 미존재
+        - `D005`: 에스크로구매결정 불가상태
+        - `D006`: 거래내역이 존재하지 않음
+        - `D007`: 고객고유번호 미입력
+        - `D008`: 거래요청내역이 존재하지 않음
+        - `D009`: 고객고유번호 검증 실패
+        - `D010`: 구매결정 이미 처리됨
+        - `D011`: 취소된 거래는 구매결정 불가
+        - `E000`: 에스크로구매거절 성공
+        - `E002`: 에스크로 가맹점 아님
+        - `E003`: 에스크로 거래만 구매거절 가능
+        - `E004`: 에스크로결제 신청내역 미존재
+        - `E005`: 에스크로구매거절 불가상태
+        - `E006`: 거래내역이 존재하지 않음
+        - `E007`: 고객고유번호 미입력
+        - `E008`: 거래요청내역이 존재하지 않음
+        - `E009`: 고객고유번호 검증 실패
+        - `E010`: 구매거절 이미 처리됨
+        - `E011`: 취소된 거래는 구매거절 불가
+        - `2001`: 취소 성공
+        - `2211`: 환불 성공 (2001과 함께 취소 성공 처리할 것)
+        - `2003`: 취소 실패
+        - `2010`: 취소 요청금액 0원 이하
+        - `2011`: 취소 금액 불일치
+        - `2012`: 취소 해당거래 없음
+        - `2013`: 취소 완료 거래
+        - `2014`: 취소 불가능 거래
+        - `2015`: 기 취소 요청
+        - `2016`: 취소 기한 초과
+        - `2017`: 취소 불가 회원사
+        - `2018`: 신용카드 매입후 취소 불가능 가맹점
+        - `2019`: 타 회원사 거래 취소 불가
+        - `2020`: 망상 취소 허용시간 초과
+        - `2021`: 매입전취소
+        - `2022`: 매입후취소
+        - `2023`: 취소 한도 초과
+        - `2024`: 취소패스워드 불일치
+        - `2025`: 취소패스워드 미 입력
+        - `2026`: 입금액보다 취소금액이 큽니다.
+        - `2027`: 에스크로 거래는 구매 또는 구매거절 시 취소가능
+        - `2028`: 부분취소 불가능 가맹점
+        - `2029`: 부분취소 불가능 결제수단
+        - `2030`: 해당결제수단 부분취소 불가
+        - `2031`: 전체금액취소 불가
+        - `2032`: 취소금액이 취소가능금액보다 큼
+        - `2033`: 부분취소 불가능금액 전체취소 이용바람
+        - `2052`: 에스크로 부분취소 불가.
+        - `A101`: SIGN DATA 검증에 실패하였습니다
+        - `A102`: "타입이 맞지않는 파라미터명 명시" + 은(는) 알 수 없는 TYPE 입니다
+        - `A106`: 날짜 형식이 올바르지 않습니다
+        - `A107`: 입금예정일이 지났습니다
+        - `A108`: 입금예정일을 오늘 이전 날짜로 설정할 수 없습니다
+        - `A109`: 요청한 MID의 설정 정보가 없습니다
+        - `A110`: 외부 연동결과 실패에 대한 코드(외부 에러메세지 그대로 전달)
+        - `A111`: 다날 휴대폰 통신 오류입니다
+        - `A112`: 비정상적인 경로로 접속되었습니다
+        - `A113`: 결제 금액이 최소 금액보다 적습니다
+        - `A114`: 상점 MID가 유효하지 않습니다
+        - `A115`: TID가 유효하지 않습니다
+        - `A116`: 요청 금액이 올바르지 않습니다
+        - `A117`: 필수입력항목이 누락되었습니다
+        - `A118`: 조회 결과데이터 없음
+        - `A119`: 일반 무이자 이벤트 조회 결과 없음
+        - `A120`: 부분 무이자 이벤트 조회 결과 없음
+        - `A121`: 정의되지 않은 카드코드 입니다
+        - `A122`: 타 상점 거래 처리 불가(MID 불일치)
+        - `A123`: 거래금액 불일치(인증된 금액과 승인요청 금액 불일치)
+        - `A124`: 해당 BID가 존재하지 않습니다
+        - `A125`: BID가 유효하지 않습니다
+        - `A126`: 이미 삭제된 빌키이거나 존재하지 않은 빌키입니다
+        - `A127`: 주문번호 중복 오류
+        - `A128`: 키인 가맹점 아닙니다
+        - `A144`: 가맹점 결과 통보에 실패하였습니다
+        - `A145`: 외화 결제는 결제수단 지정하여 이용 가능 합니다
+        - `A146`: 외화 결제 불가한 결제수단 입니다
+        - `A147`: 필드 길이가 초과되었습니다
+        - `A148`: 빌링 승인은 별도 API 이용 바랍니다
+        - `A149`: 빌링 승인만 가능한 API 입니다.(일반결제는 별도 API이용)
+        - `A150`: ARS 이용 가맹점이 아닙니다
+        - `A201`: PID 생성이 누락되었습니다
+        - `A202`: 결과코드 생성이 누락되었습니다
+        - `A203`: 결과메시지 생성이 누락되었습니다
+        - `A204`: 전문 복호화 오류가 발생하였습니다
+        - `A205`: 전문 암호화 오류가 발생하였습니다
+        - `A210`: 인증 요청내역이 존재하지 않습니다
+        - `A211`: 해쉬값 검증에 실패하였습니다
+        - `A212`: 잘못된 데이터 형식입니다
+        - `A213`: API 초기화 오류
+        - `A214`: 해당하는 카드거래가 없습니다
+        - `A215`: 해당하는 핸드폰거래가 없습니다
+        - `A216`: 해당하는 계좌이체거래가 없습니다
+        - `A217`: 해당하는 가상계좌거래가 없습니다
+        - `A218`: 해당하는 전자상품권거래가 없습니다
+        - `A219`: 환율정보 설정 오류 입니다
+        - `A220`: 설정된 환율 정보가 없습니다
+        - `A221`: 노티 수신정보 없음
+        - `A222`: 카드코드가 일치하지 않습니다
+        - `A223`: billKey 정보를 찾을 수 없습니다
+        - `A224`: 허용되지 않은 IP입니다
+        - `A225`: TID 중복 오류
+        - `A226`: 전문통신 과정에서 오류가 발생하였습니다
+        - `A227`: 필드명 중복 발생
+        - `A241`: VISA3D 인증을 이용할 수 없는 카드 입니다
+        - `A242`: 정의되지 않은 지불수단 입니다
+        - `A243`: 주문정보가 존재하지 않습니다
+        - `A244`: 주문내역 갱신에 실패하였습니다
+        - `A245`: 인증 시간이 초과 되었습니다
+        - `A246`: 비정상 과다접속으로 인한 오류입니다
+        - `A247`: 정의되지 않은 통화코드 입니다
+        - `A248`: 사용할 수 없는 화폐 단위 입니다.(계약정보 확인필요)
+        - `A249`: 주문정보저장 실패(ORDER_DATA 최대 길이 초과)
+        - `A250`: 휴대폰번호 변조 오류(요청 번호와 인증완료 번호 상이)
+        - `A251`: 거래내역이 존재하지 않습니다.
+        - `A252`: Signature 생성에 실패하였습니다.
+        - `A253`: 빌키(BID) 생성에 실패하였습니다.
+        - `A254`: 제휴사 응답전문이 유효하지 않습니다.
+        - `A255`: 타 상점 빌키(BID) 삭제 불가.
+        - `A256`: ARS인증번호생성실패. 잠시후 재시도 바랍니다.
+        - `A257`: 주문정보 저장에 실패하였습니다.
+        - `A258`: SMS 발송에 실패하였습니다.
+        - `A299`: API 지연처리 발생.
+        - `A300`: 기준정보 조회오류.
+        - `A301`: 가맹점키 조회 오류입니다.
+        - `A302`: 기준정보상 필수 설정 정보가 없습니다.
+        - `A303`: 기준정보 CPID 설정 정보가 없습니다.
+        - `A304`: DB테이블 INSERT 오류발생.
+        - `A305`: 가맹점번호 기준정보 미설정 오류.
+        - `A306`: DB테이블 UPDATE 실패.
+        - `A307`: 기준정보 조회 결과 2행 이상 오류
+        - `A400`: 대외기관 전문생성에 실패하였습니다.
+        - `A401`: 대외계 전문통신 과정에서 오류가 발생하였습니다.
+        - `A402`: DB트랜잭션 처리에 실패하였습니다.
+        - `A403`: 대외기관 응답 전문이 올바르지 않습니다.
+        - `9000`: "누락된 필드명" + 필드값이 누락되었습니다.
+        - `9001`: 필드 길이가 잘못되었습니다.
+        - `9002`: Try-Catch-Exception:"Exception 내용"
+        - `S999`: 기타오류가 발생하였습니다.
+        - `S001`: 요청템플릿이 존재하지 않습니다.
+        - `S002`: 응답템플릿이 존재하지 않습니다.
+        - `T001`: 수신메시지 인코딩 중 예외가 발생하였습니다
+        - `T002`: 비정상적인 수신 전문입니다
+        - `T003`: 수신데이터 파싱 중 예외가 발생하였습니다
+        - `T004`: 요청 전문의 헤더부 생성 중 오류가 발생하였습니다
+        - `T005`: 요청 전문의 바디부 생성 중 오류가 발생하였습니다
+        - `X001`: 서버 도메인명이 잘못 설정되었습니다
+        - `X002`: 서버로 소켓 연결 중 오류가 발생하였습니다
+        - `X003`: 전문 수신 중 오류가 발생하였습니다
+        - `X004`: 전문 송신 중 오류가 발생하였습니다
+        - `V005`: 지원하지 않는 지불수단입니다
+        - `V101`: 암호화 플래그 미설정 오류입니다
+        - `V102`: 서비스모드를 설정하지 않았습니다
+        - `V103`: 지불수단을 설정하지 않았습니다
+        - `V104`: 상품개수 미설정 오류입니다
+        - `V201`: 상점ID 미설정 오류입니다
+        - `V202`: LicenseKey 미설정 오류입니다
+        - `V203`: 통화구분 미설정 오류입니다
+        - `V204`: MID 미설정 오류입니다
+        - `V205`: MallIP 미설정 오류입니다
+        - `V301`: 구매자이름 미설정 오류입니다
+        - `V302`: 구매자인증번호 미설정 오류입니다
+        - `V303`: 구매자연락처 미설정 오류입니다
+        - `V304`: 구매자메일주소 미설정 오류입니다
+        - `V401`: 상품명 미설정 오류입니다
+        - `V402`: 상품금액 미설정 오류입니다
+        - `V501`: 카드형태 미설정 오류입니다
+        - `V502`: 카드구분 미설정 오류입니다
+        - `V503`: 카드코드 미설정 오류입니다
+        - `V504`: 카드번호 미설정 오류입니다
+        - `V505`: 카드무이자여부 미설정 오류입니다
+        - `V506`: 카드인증구분 미설정 오류입니다
+        - `V507`: 카드형태 설정 오류입니다
+        - `V508`: 카드형태 허용하지 않는 값을 설정하였습니다
+        - `V509`: 카드구분 허용하지 않는 값을 설정하였습니다
+        - `V510`: 유효기간 미설정 오류입니다
+        - `V511`: 유효기간 허용하지 않는 값을 설정하였습니다
+        - `V512`: 유효기간의 월 형태가 잘못 설정되었습니다
+        - `V513`: 카드 비밀번호 미입력 오류입니다
+        - `V601`: 은행코드 미설정 오류입니다
+        - `V602`: 금융결제원 암호화 데이터 미설정 오류입니다
+        - `V701`: 가상계좌입금만료일 미설정 오류입니다
+        - `VA01`: 거래KEY 미설정 오류입니다
+        - `VA02`: 이통사구분 미설정 오류입니다
+        - `VA03`: SMS승인번호 미설정 오류입니다
+        - `VA04`: 업체TID 미설정 오류입니다
+        - `VA05`: 휴대폰번호 미설정 오류입니다
+        - `VA09`: 고객고유번호(주민번호,사업자번호) 미설정 오류입니다
+        - `VA10`: ENCODE 업체TID 미설정 오류입니다
+        - `VB02`: 이통사구분 미설정 오류입니다
+        - `VB05`: 휴대폰번호 미설정 오류입니다
+        - `VB09`: 고객고유번호(주민번호,사업자번호) 미설정 오류입니다
+        - `VB10`: 고객 IP 미설정 오류입니다
+        - `V801`: 취소금액 미설정 오류입니다
+        - `V802`: 취소사유 미설정 오류입니다
+        - `V803`: 취소패스워드 미설정 오류입니다
+        - `P001`: 클라이언트 아이디가 없습니다.
+        - `P002`: 토큰생성을 실패하였습니다.
+        - `P003`: 로그추적아이디 생성을 실패하였습니다.
+        - `P004`: SID가 생성되지 않았습니다.
+        - `P005`: 해당되는 MID 정보가 없습니다.
+        - `P006`: 해당되는 GID 정보가 없습니다.
+        - `P007`: 필수 파라미터 {param}가 없습니다.
+        - `P008`: 파라미터 {}:{} 길이가 취소길이{} 보다 작은값 입니다.
+        - `P009`: 파라미터 {}:{} 길이가 최대길이{} 보다 큰값 입니다.
+        - `P010`: 파라미터 {key}[{value}]가 숫자형식이 아닙니다.
+        - `P011`: 파라미터 {key}[{value}]가 boolean형식이 아닙니다.
+        - `P012`: 파라미터 {key}[{value}]는 {} 값만 허용 합니다.
+        - `P013`: 파라미터 {}[{}]이 공급가액, 부가세, 봉사료, 비과세급액의 합과 동일하지 않습니다.
+        - `P014`: Mid [{}]에 해당 하는 merchant key 정보가 없습니다.
+        - `P015`: orderid {}가 이미 존재합니다.
+        - `P016`: 파라미터로 전달된 MID {}에 대한 사용이 불가 합니다.
+        - `P017`: 결제금액은 0원 결제가 불가합니다.
+        - `P018`: 인증 응답 토큰 데이터가 없습니다.
+        - `P019`: 요청된 인증 정보가 없습니다. Token [{}].
+        - `P020`: 네이버페이 easyPayMethod 데이터 확인이 필요합니다.
+        - `P021`: 지원 카드가 아닙니다.
+        - `P022`: 카드와 할부가 동시에 설정되어야 합니다.
+        - `P023`: 간편결제는 [{}]와 함께 사용이 불가합니다.
+        - `P024`: 날짜형식(ISO8601)이 아닙니다.
+        - `P025`: 트랜잭션 타입이 일치하지 않습니다.
+        - `P026`: 승인서버 요청 에러
+        - `P027`: 원격 실패(MCI)
+        - `P028`: 일시불 01 에러 (일시불은 00으로 설정)
+        - `P029`: 해당 지불수단은 카드 지정, 할부 지정이 불가 합니다.
+        - `P030`: 해당 지불수단은 카드 지정, 할부 지정이 필수 입니다.
+        - `P031`: 가상계좌 유효시간 지정 오류 입니다.
+        - `P032`: 다이렉트 및 간편결제는 에스크로 이용이 불가 합니다.
+        - `P033`: 간편결제는 다중카드 선택이 불가합니다.
+        - `P034`: 요청된 금액과 내역 금액이 일치하지 않습니다.
+        - `P035`: 망취소 요청 오류 입니다.
+        - `P036`: 면세금액이 결제금액을 초과할수 없습니다.
+        - `P037`: 5만원 미만인 경우 할부 지정이 불가 합니다.
+        - `P038`: 요청전문 검증오류 입니다.
+        - `P039`: 세션키는 필수 값입니다.
+        - `P040`: 세션키에 해당하는 주문정보가 존재하지 않습니다.
+        - `P041`: 세션키 길이가 잘못되었습니다.
+        - `P042`: 이미 만료된 세션 아이디 입니다.
+        - `P043`: 유효하지 않은 세션 아이디 입니다.
+        - `P044`: 승인 상태 수정에 실패하였습니다.
+        - `P101`: DB 트랜잭션 실패
+        - `P102`: auth history 데이터 추가 실패하였습니다.
+        - `P103`: log trace 데이터 추가 실패하였습니다.
+        - `P091`: 결제 요청을 취소하였습니다.
+        - `U100`: {0} 필수입력항목이 누락되었습니다.
+        - `U101`: BASE64 DECODE 실패
+        - `U102`: 사용자 인증정보가 존재하지 않습니다.
+        - `U103`: 사용자 인증타입이 맞지 않습니다.
+        - `U104`: 사용자 인증에 실패하였습니다.
+        - `U105`: 필드 최대길이 초과[max:{0}, realLength:{1}]
+        - `U106`: 현금영수증 취소는 별도 API 이용 요망
+        - `U107`: 거래내역이 존재 하지 않습니다.
+        - `U108`: 허가되지 않은 요청 입니다.
+        - `U109`: 허용되지 않은 요청 입니다.
+        - `U110`: 지원하지 않는 지불수단 입니다.
+        - `U111`: 조회내용이 없습니다.
+        - `U112`: 이미 사용된 OrderId 입니다.
+        - `U113`: 빌키 승인 금액 불일치
+        - `U114`: 이미 사용된 TID 입니다.
+        - `U115`: 삭제 처리된 BID 입니다.
+        - `U116`: 사용자 정보가 존재하지 않습니다.
+        - `U117`: 사용자 비밀번호가 일치하지 않습니다.
+        - `U118`: 이용 불가한 사용자 정보 입니다.
+        - `U119`: 지원하지 않는 지불수단입니다.
+        - `U120`: TID가 유효하지 않습니다.
+        - `U121`: 인증 요청내역이 존재하지 않습니다.
+        - `U122`: 취소 해당거래 없음
+        - `U123`: 취소금액이 취소가능금액보다 큼.
+        - `U124`: 필드 길이가 잘못되었습니다.
+        - `U125`: 잘못된 요청 입니다.
+        - `U126`: orderId가 존재 하지 않습니다.
+        - `U127`: 요청 금액이 올바르지 않습니다.
+        - `U128`: 부분취소는 운영 환경에서 이용 가능(샌드박스는 부분취소 미제공)
+        - `U129`: 잘못된 요청 기간 입니다.
+        - `U130`: 허용된 Date형식이 아닙니다.
+        - `U131`: 허용된 Data형식이 아닙니다.
+        - `U132`: 허용된 옵션 내용이 아닙니다.[{0}]
+        - `U301`: ORDER_DATA 최대 길이 초과.
+        - `U302`: 응답전문 최대 길이 초과.
+        - `U303`: API 지연처리 발생.
+        - `U304`: BASIC AUTHENTICATION 실패
+        - `U305`: BEARER AUTHENTICATION 실패
+        - `U306`: 전자서명 및 암호화메시지 검증 실패
+        - `U307`: 인증정보 확인중 오류가 발생하였습니다.
+        - `U308`: Method Not Allowed.
+        - `U309`: 발급되지 않은 BID 입니다.
+        - `U310`: SIGN DATA 생성에 실패하였습니다.
+        - `U311`: 인증이 취소되었거나 실패하였습니다. 다시 시도하여 주십시요.
+        - `U312`: SIGN DATA 검증에 실패하였습니다.
+        - `U313`: 상점 MID가 유효하지 않습니다.
+        - `U314`: 전문 암호화 오류가 발생하였습니다.
+        - `U315`: 허용되지 않은 IP 입니다.
+        - `U316`: 상점 기준정보가 유효하지 않습니다.
+        - `U317`: 인증정보 확인중 오류가 발생하였습니다.
+        - `U318`: 취소 금액 불일치
+        - `U319`: 요청하신 면세금액이 취소가능한 면세금액을 초과 오류
+        - `U320`: 페이지를 찾을 수 없습니다.
+        - `U321`: 면세금액이 결제금액 보다 큼.
+        - `U322`: 세션아이디 생성을 실패 하였습니다.
+        - `U323`: 세션아이디 만료 변경이 실패 하였습니다.
+        - `U324`: 이미 발급된 세션아이디 입니다.
+        - `U325`: 이미 만료된 세션아이디 입니다.
+        - `U501`: 대외계 전문통신 과정에서 오류가 발생하였습니다.
+        - `U502`: 요청 금액이 올바르지 않습니다.
+        - `U503`: 망취소 요청
+        - `U504`: 결제에 실패하였습니다.(망취소 처리)
+        - `U506`: DB 테이블 INSERT 오류발생.
+        - `U507`: DB 테이블 UPDATE 실패.
+        - `U508`: 서버로 소켓 연결 중 오류가 발생하였습니다.
+        - `U509`: 기준정보 조회 결과 2행 이상 오류
+        - `U700`: WEBHOOK 응답전문 최대 길이 초과.
+        - `C001`: ISP 인증이 취소되었거나 실패하였습니다 다시 시도하여 주십시요
+        - `C002`: 카드사 인증 실패
+        - `I001`: 서버와의 통신에 실패하였습니다 네트워크 환경을 확인하세요
+        - `I002`: 사용자가 결제를 취소하였습니다
+        - `I003`: 인증 성공한 거래로 재요청 되었습니다 결제가 정상적으로 이루어 지지 않았을 경우 가맹점 페이지로 가서 다시 결제하여 주십시요
+        - `I004`: 인증 실패한 거래로 재요청 되었습니다 가맹점 페이지로 가서 다시 결제하여 주십시요
+        - `I006`: 화면 구성 처리에 실패하였습니다 가맹점 페이지로 가서 다시 결제하여 주십시요
+        - `I007`: 바로 호출 결제요청 정보를 확인하십시오
+        - `M001`: 계좌이체 CPID를 확인해 주세요
+        - `M002`: CPID미설정 오류입니다
+        - `N001`: 30만원 이상 결제는 지원되지 않습니다
+        - `N002`: 주문내역 갱신에 실패하였습니다
+        - `N003`: 인증기관 거래설정에 실패하였습니다 가맹점 페이지로 가서 다시 결제하여 주십시요
+        - `S004`: 무이자 설정 정보 오류
+        - `S005`: 청구할인 행사 정보 오류
+        - `V001`: 가맹점 아이디가 조회 되지 않습니다
+        - `V003`: 비정상 과다접속으로 인한 오류입니다 다시 결제 시도하시기 바랍니다
+        - `V004`: 할부개월 설정 오류
+        - `W000`: 정상 처리되었습니다
+        - `W001`: 주문번호가 유효하지 않습니다
+        - `W002`: TID가 유효하지 않습니다
+        - `U332`: 간편결제는 cardCode, cardQuota와 함께 사용이 불가합니다.
+        - `U333`: 이미 등록된 URL 정보가 있습니다.
+        - `U334`: 웹훅 URL 수정을 실패하였습니다.
+        - `U335`: 웹훅 URL 생성을 실패하였습니다.
+        - `U336`: 해당 URL 페이지 요청을 실패하였습니다.
+        - `U337`: HTTP 상태 코드가 정상(200)이 아닙니다.
+        - `U338`: 응답 페이지 Body 부분은 OK 문자만 허용됩니다.
+
+      enum:
+        - "0000"
+        - "1534"
+        - "1615"
+        - "2000"
+        - "2001"
+        - "2003"
+        - "2010"
+        - "2011"
+        - "2012"
+        - "2013"
+        - "2014"
+        - "2015"
+        - "2016"
+        - "2017"
+        - "2018"
+        - "2019"
+        - "2020"
+        - "2021"
+        - "2022"
+        - "2023"
+        - "2024"
+        - "2025"
+        - "2026"
+        - "2027"
+        - "2028"
+        - "2029"
+        - "2030"
+        - "2031"
+        - "2032"
+        - "2033"
+        - "2052"
+        - "2151"
+        - "2152"
+        - "2154"
+        - "2156"
+        - "2157"
+        - "2158"
+        - "2159"
+        - "2201"
+        - "2211"
+        - "3001"
+        - "3011"
+        - "3012"
+        - "3013"
+        - "3014"
+        - "3021"
+        - "3022"
+        - "3023"
+        - "3024"
+        - "3031"
+        - "3032"
+        - "3033"
+        - "3034"
+        - "3041"
+        - "3051"
+        - "3052"
+        - "3053"
+        - "3054"
+        - "3055"
+        - "3056"
+        - "3057"
+        - "3061"
+        - "3062"
+        - "3071"
+        - "3072"
+        - "3073"
+        - "3081"
+        - "3091"
+        - "3095"
+        - "4000"
+        - "4001"
+        - "4002"
+        - "4003"
+        - "4004"
+        - "4005"
+        - "4006"
+        - "4007"
+        - "4008"
+        - "4100"
+        - "4101"
+        - "4102"
+        - "4103"
+        - "4104"
+        - "4105"
+        - "4106"
+        - "4107"
+        - "4108"
+        - "4109"
+        - "4110"
+        - "4111"
+        - "4112"
+        - "4113"
+        - "4114"
+        - "4115"
+        - "4116"
+        - "4117"
+        - "4118"
+        - "4119"
+        - "4120"
+        - "4121"
+
+    CardCode:
+      type: string
+      description: |
+        결제에 사용된 카드사를 식별하는 코드입니다.
+        (코드: 한글(영문) / 결제창 지원 여부)
+        - `01`: 비씨(BC) / 결제창: O
+        - `02`: KB국민(KB Kookmin) / 결제창: O
+        - `03`: 하나(외환)(KEB Bank) / 결제창: O
+        - `04`: 삼성(SAMSUNG) / 결제창: O
+        - `06`: 신한(SHINHAN) / 결제창: O
+        - `07`: 현대(HYUNDAI) / 결제창: O
+        - `08`: 롯데(LOTTE) / 결제창: O
+        - `11`: 씨티(CITI) / 결제창: O
+        - `12`: NH채움(NH) / 결제창: O
+        - `13`: 수협(SUHYUP) / 결제창: O
+        - `14`: 신협(SHINHYUP) / 결제창: O
+        - `15`: 우리(WOORI) / 결제창: O
+        - `16`: 하나(HANA SK) / 결제창: O
+        - `21`: 광주(KWANGJU) / 결제창: O
+        - `22`: 전북(JEONBUK) / 결제창: O
+        - `23`: 제주(JEJU) / 결제창: O
+        - `24`: 산은캐피탈(KDB Capital) / 결제창: O
+        - `25`: 해외비자(VISA) / 결제창: O
+        - `26`: 해외마스터(MASTER) / 결제창: O
+        - `27`: 해외다이너스(DINERS) / 결제창: O
+        - `28`: 해외AMX(AMEX) / 결제창: O
+        - `29`: 해외JCB(JCB) / 결제창: O
+        - `31`: SK-OKCashBag(SK-OKCashBag) / 결제창: X
+        - `32`: 우체국(Post) / 결제창: O
+        - `33`: 저축은행(Savings Bank) / 결제창: O
+        - `34`: 은련(UnionPay) / 결제창: O
+        - `35`: 새마을금고(MG) / 결제창: O
+        - `36`: KDB산업(KDB Bank) / 결제창: O
+        - `37`: 카카오뱅크(Kakao Bank) / 결제창: O
+        - `38`: 케이뱅크(KBank) / 결제창: X
+        - `39`: 페이코포인트(PAYCO) / 결제창: O
+        - `40`: 카카오머니(KAKAO) / 결제창: O
+        - `41`: SSG머니(SSG) / 결제창: O
+        - `42`: 네이버포인트(NAVER) / 결제창: O
+      enum:
+        - "01"
+        - "02"
+        - "03"
+        - "04"
+        - "06"
+        - "07"
+        - "08"
+        - "11"
+        - "12"
+        - "13"
+        - "14"
+        - "15"
+        - "16"
+        - "21"
+        - "22"
+        - "23"
+        - "24"
+        - "25"
+        - "26"
+        - "27"
+        - "28"
+        - "29"
+        - "31"
+        - "32"
+        - "33"
+        - "34"
+        - "35"
+        - "36"
+        - "37"
+        - "38"
+        - "39"
+        - "40"
+        - "41"
+        - "42"
+
+    BankCode:
+      type: string
+      description: |
+        계좌이체 또는 가상계좌 발급에 사용된 은행을 식별하는 코드입니다.
+        (코드: 은행명 (영문) / 가상계좌 발급 가능 여부)
+        - `001`: 한국은행 (Bank of Korea) / 가상계좌: X
+        - `002`: 산업은행 (KDB Bank) / 가상계좌: X
+        - `003`: 기업은행 (IBK) / 가상계좌: O
+        - `004`: 국민은행 (Kookmin Bank) / 가상계좌: O
+        - `005`: 외환은행 (Korea Exchange Bank) / 가상계좌: O
+        - `007`: 수협중앙회 (Suhyup Federation) / 가상계좌: X
+        - `008`: 수출입은행 (The Export-Import Bank of Korea) / 가상계좌: X
+        - `011`: 농협중앙회 (National Agricultural Cooperative Federation) / 가상계좌: O
+        - `012`: 농협회원조합 (National Agricultural Cooperative Federation of Members) / 가상계좌: X
+        - `020`: 우리은행 (WooriBank) / 가상계좌: O
+        - `023`: SC은행 (SCBank) / 가상계좌: O
+        - `026`: 서울은행 (Seoul Bank) / 가상계좌: X
+        - `027`: 한국씨티은행 (Korea city Bank) / 가상계좌: X
+        - `031`: 대구은행 (Daegu Bank) / 가상계좌: O
+        - `032`: 부산은행 (Busan Bank) / 가상계좌: O
+        - `034`: 광주은행 (KwangjuBank) / 가상계좌: O
+        - `035`: 제주은행 (Jeju Bank) / 가상계좌: X
+        - `037`: 전북은행 (JeonBuk Bank) / 가상계좌: X
+        - `039`: 경남은행 (Kyongnam Bank) / 가상계좌: X
+        - `045`: 새마을금고연합회 (KFCC Federation) / 가상계좌: X
+        - `048`: 신협중앙회 (National Credit Union Federation of Korea) / 가상계좌: X
+        - `050`: 상호저축은행 (Mutual Savings Bank) / 가상계좌: X
+        - `071`: 우체국 (Postal Savings for the Ministry of Information and Communication) / 가상계좌: O
+        - `081`: 하나은행 (HanaBank) / 가상계좌: O
+        - `088`: 신한은행 (ShinhanBank) / 가상계좌: O
+        - `089`: 케이뱅크 (K Bank) / 가상계좌: O
+        - `090`: 카카오뱅크 (Kakao Bank) / 가상계좌: X
+      enum:
+        - "001"
+        - "002"
+        - "003"
+        - "004"
+        - "005"
+        - "007"
+        - "008"
+        - "011"
+        - "012"
+        - "020"
+        - "023"
+        - "026"
+        - "027"
+        - "031"
+        - "032"
+        - "034"
+        - "035"
+        - "037"
+        - "039"
+        - "045"
+        - "048"
+        - "050"
+        - "071"
+        - "081"
+        - "088"
+        - "089"
+        - "090"

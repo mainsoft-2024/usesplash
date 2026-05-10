@@ -20,6 +20,18 @@
       "source": "resciencelab/opc-skills",
       "sourceType": "github",
       "computedHash": "b3ef6022c2d2b1be94fa2d52ae0da749495eef1fe4ea2becd413f052c03a13e6"
+    },
+    "nicepay-devguide": {
+      "source": "mainsoft-2024/opencode-skill-nicepay-devguide",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "9758056960b2a58b10d534db653b13efca1a145244d13f8263d23d71a313922c"
+    },
+    "nicepay-start-api": {
+      "source": "paulp-o/opencode-skill-nicepay-start-api",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "73b0d4858698c57835d4fffe7a68ca274999a8773c603bc42f7f0b128dbcaec7"
     }
   }
 }

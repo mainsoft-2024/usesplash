@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.1.0",
+  "projectId": null,
+  "createdAt": "2026-04-27T07:17:42.879Z",
+  "updatedAt": "2026-04-27T07:17:52.737Z",
+  "platform": "local",
+  "app": {
+    "type": "webapp",
+    "framework": "nextjs",
+    "runtime": "node"
+  },
+  "preferences": {
+    "techPreference": "high",
+    "questionLevel": "medium",
+    "designDocs": true,
+    "subagentMode": "standard",
+    "specDriven": true,
+    "tdd": false
+  },
+  "deployment": {
+    "provider": "none",
+    "status": "not_deployed",
+    "url": null,
+    "lastDeployedAt": null
+  },
+  "resources": [],
+  "devServers": []
+}

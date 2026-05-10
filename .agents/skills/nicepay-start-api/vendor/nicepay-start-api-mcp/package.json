@@ -1,0 +1,35 @@
+{
+  "name": "@nicepay/start-api-mcp",
+  "version": "0.0.10",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "nicepay-mcp-start": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"const fs = require('fs'); fs.cpSync('src/openapi', 'dist/openapi', { recursive: true }); fs.mkdirSync('dist/qna', { recursive: true }); fs.copyFileSync('src/qna/questions.json', 'dist/qna/questions.json'); fs.chmodSync('dist/index.js', '755');\" && node dist/scripts/generate_tool_groups.js",
+    "postbuild": "rm -rf .DS_Store"
+  },
+  "files": [
+    "dist",
+    "dist/qna/questions.json",
+    "dist/openapi/openapi.yaml"
+  ],
+  "keywords": ["nicepay", "modelcontextprotocol", "mcp", "tool", "qna"],
+  "author": "kanghokim <wecv@nicepay.co.kr>",
+  "license": "MIT",
+  "description": "NICEPAY 결제 연동을 위한 MCP 툴 (https://start.nicepay.co.kr)",
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^10.1.0",
+    "@modelcontextprotocol/sdk": "^1.13.1",
+    "js-yaml": "^4.1.0",
+    "openapi3-ts": "^4.5.0",
+    "zod": "^3.25.67",
+    "minisearch": "^6.2.0"
+  }
+}

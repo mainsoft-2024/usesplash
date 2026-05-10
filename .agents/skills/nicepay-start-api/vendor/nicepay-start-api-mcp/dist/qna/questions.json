@@ -1,0 +1,957 @@
+[
+  {
+    "id": 1,
+    "question": "나이스페이 JS SDK는 어떻게 호출하나요?",
+    "answer": "브라우저에서 `<script src='https://pay.nicepay.co.kr/v1/js/'></script>`를 삽입한 뒤, `AUTHNICE.requestPay()` 메서드를 사용하여 호출합니다. `fnError` 콜백 함수는 반드시 `AUTHNICE.requestPay()` 메서드에 포함되어야 합니다."
+  },
+  {
+    "id": 2,
+    "question": "결제창 호출 후 인증 결과는 어떻게 확인하나요?",
+    "answer": "카드사 인증에 성공하면 `authResultCode`가 '0000'으로 응답되고, 인증 결과는 `returnUrl`에 POST 방식으로 전달됩니다."
+  },
+  {
+    "id": 3,
+    "question": "샌드박스 결제 승인 API는 어떻게 호출하나요?",
+    "answer": "인증 성공 후 발급된 `tid`를 사용하여 `https://sandbox-api.nicepay.co.kr/v1/payments/{tid}`에 POST 요청하면 됩니다."
+  },
+  {
+    "id": 4,
+    "question": "운영 결제 승인 API는 어떻게 호출하나요?",
+    "answer": "인증 성공 후 발급된 `tid`를 사용하여 `https://api.nicepay.co.kr/v1/payments/{tid}`에 POST 요청하면 됩니다."
+  },  
+  {
+    "id": 5,
+    "question": "Authorization Basic 헤더는 어떻게 생성하나요?",
+    "answer": "`client-key:secret-key`를 `Base64`로 인코딩한 문자열을 Authorization 헤더에 `Basic {인코딩된문자열}`로 사용합니다."
+  },
+  {
+    "id": 6,
+    "question": "샌드박스 테스트 시 유의사항은?",
+    "answer": "테스트 시 운영 도메인과 key를 변경하지 않아야 하며, 인증이 성공해도 실제 결제가 발생하지 않습니다."
+  },
+  {
+    "id": 7,
+    "question": "샌드박스 응답 예시는 어떻게 되나요?",
+    "answer": "결제 성공 시 응답은 JSON 형식이며, `resultCode`가 '0000'이면 결제 승인에 성공한 것입니다. 카드 정보는 임의값으로 응답됩니다."
+  },
+  {
+    "id": 8,
+    "question": "SDK 테스트 중 오류가 발생했을 때 디버깅 방법은?",
+    "answer": "`fnError` 콜백 함수에서 전달된 `errorMsg`를 확인하여 원인을 파악할 수 있습니다."
+  },
+  {
+    "id": 9,
+    "question": "JS SDK 사용 시 returnUrl은 무엇인가요?",
+    "answer": "결제 인증이 완료된 후 결과가 전달되는 가맹점의 서버 Endpoint URL입니다."
+  },
+  {
+    "id": 10,
+    "question": "JS SDK 결제 방식은 어떤 구조인가요?",
+    "answer": "`AUTHNICE.requestPay()` 메서드를 호출하면 결제창이 뜨고, 결제자가 카드사 인증 후 응답을 가맹점 서버로 전달합니다."
+  },
+  {
+    "id": 11,
+    "question": "나이스페이 JS SDK는 어떻게 호출하나요?",
+    "answer": "브라우저에서 `<script src='https://pay.nicepay.co.kr/v1/js/'></script>`를 삽입한 뒤, `AUTHNICE.requestPay()` 메서드를 사용하여 호출합니다."
+  },
+  {
+    "id": 12,
+    "question": "결제창 호출 후 인증 결과는 어떻게 확인하나요?",
+    "answer": "카드사 인증에 성공하면 `authResultCode`가 '0000'으로 응답되고, 인증 결과는 `returnUrl`에 POST 방식으로 전달됩니다."
+  },
+  {
+    "id": 13,
+    "question": "결제 승인 API는 어떻게 호출하나요?",
+    "answer": "인증 성공 후 발급된 `tid`를 사용하여 `https://sandbox-api.nicepay.co.kr/v1/payments/{tid}`에 POST 요청하면 됩니다."
+  },
+  {
+    "id": 14,
+    "question": "Authorization Basic 헤더는 어떻게 생성하나요?",
+    "answer": "`client-key:secret-key`를 `Base64`로 인코딩한 문자열을 Authorization 헤더에 `Basic {인코딩된문자열}`로 사용합니다."
+  },
+  {
+    "id": 15,
+    "question": "샌드박스 테스트 시 유의사항은?",
+    "answer": "테스트 시 운영 admin에서 key를 별도 발급받아야 하고, 인증이 성공해도 실제 결제가 발생하지 않습니다."
+  },
+  {
+    "id": 16,
+    "question": "샌드박스 응답 예시는 어떻게 되나요?",
+    "answer": "결제 성공 시 응답은 JSON 형식이며, `resultCode`가 '0000'이면 결제 승인에 성공한 것입니다. 카드 정보는 임의값으로 응답됩니다."
+  },
+  {
+    "id": 17,
+    "question": "SDK 테스트 중 오류가 발생했을 때 디버깅 방법은?",
+    "answer": "`fnError` 콜백 함수에서 전달된 `errorMsg`를 확인하여 원인을 파악할 수 있습니다."
+  },
+  {
+    "id": 18,
+    "question": "JS SDK 사용 시 returnUrl은 무엇인가요?",
+    "answer": "결제 인증이 완료된 후 결과가 전달되는 가맹점의 서버 Endpoint URL입니다."
+  },
+  {
+    "id": 19,
+    "question": "JS SDK 결제 방식은 어떤 구조인가요?",
+    "answer": "`AUTHNICE.requestPay()` 메서드를 호출하면 결제창이 뜨고, 결제자가 카드사 인증 후 응답을 가맹점 서버로 전달합니다."
+  },
+  {
+    "id": 20,
+    "question": "웹훅은 어떤 상황에서 호출되나요?",
+    "answer": "웹훅은 결제 승인, 가상계좌 채번, 입금 완료, 결제 취소 시점 등에 자동으로 호출되어 등록된 엔드포인트로 데이터를 전달합니다."
+  },
+  {
+    "id": 21,
+    "question": "웹훅 엔드포인트에서 어떤 응답을 해야 하나요?",
+    "answer": "HTTP 200 상태와 함께 Content-Type: text/html, 그리고 ResponseBody에 'OK' 문자열을 포함해야 정상 수신 처리됩니다."
+  },
+  {
+    "id": 22,
+    "question": "웹훅에서 signature 값은 무엇인가요?",
+    "answer": "signature는 위변조 검증용 해시값으로, tid + amount + ediDate + SecretKey 조합의 sha256 해시를 hex로 표현한 값입니다."
+  },
+  {
+    "id": 23,
+    "question": "웹훅 데이터에서 status는 어떤 값을 가질 수 있나요?",
+    "answer": "status는 paid, ready, failed, cancelled, partialCancelled, expired 중 하나의 값을 가질 수 있습니다."
+  },
+  {
+    "id": 24,
+    "question": "웹훅 실패 시 재전송이 가능한가요?",
+    "answer": "네, 나이스페이(https://start.nicepay.co.kr/) 관리 화면에서 [재전송] 기능을 통해 웹훅 전문을 다시 전송할 수 있습니다."
+  },
+  {
+    "id": 25,
+    "question": "웹훅을 테스트할 수 있는 기능이 있나요?",
+    "answer": "네, 나이스페이(https://start.nicepay.co.kr/) 관리 화면에서 웹훅을 등록한 후 [TEST 호출] 기능을 통해 실제 데이터 없이 테스트 전문을 엔드포인트로 전송할 수 있습니다."
+  },
+  {
+    "id": 26,
+    "question": "웹훅을 통한 결제 상태 확인이 필요한 이유는 무엇인가요?",
+    "answer": "가상계좌와 같이 실시간으로 상태 변화가 발생하는 결제수단은 웹훅을 통해 상태를 수신해야 자동화된 처리가 가능합니다."
+  },
+  {
+    "id": 27,
+    "question": "현금영수증 발급 요청은 어떻게 하나요?",
+    "answer": "`/v1/receipt` 엔드포인트에 결제자 정보와 금액 등을 포함한 JSON 데이터를 POST 요청하면 됩니다."
+  },
+  {
+    "id": 28,
+    "question": "현금영수증 발급 후 조회는 언제 가능한가요?",
+    "answer": "발급 요청이 성공하면 D+2 영업일 기준으로 `/v1/receipt/{tid}` API를 호출하여 발급 여부를 조회할 수 있습니다."
+  },
+  {
+    "id": 29,
+    "question": "현금영수증 발급 성공이 의미하는 것은 무엇인가요?",
+    "answer": "국세청에 데이터 전달을 위한 요청이 완료되었음을 의미하며, 발급 여부는 D+2일에 확인 가능합니다."
+  },
+  {
+    "id": 30,
+    "question": "현금영수증 취소는 어떻게 하나요?",
+    "answer": "발급된 `tid`를 기반으로 `/v1/receipt/{tid}/cancel` 엔드포인트에 취소 사유와 금액 등을 포함한 데이터를 POST 요청하면 됩니다."
+  },
+  {
+    "id": 31,
+    "question": "현금영수증 발급 유형에는 어떤 것이 있나요?",
+    "answer": "`individual`(개인 소득공제용), `company`(사업자 지출증빙용) 두 가지 유형이 있으며, `receiptType` 필드로 구분합니다."
+  },
+  {
+    "id": 32,
+    "question": "현금영수증 발급에 필요한 정보는 무엇인가요?",
+    "answer": "`orderId`, `amount`, `goodsName`, `receiptType`, `receiptNo`, 공급가액 관련 필드(supplyAmt 등)가 필수로 필요합니다."
+  },
+  {
+    "id": 33,
+    "question": "현금영수증 발급 이후 성공 여부는 어떻게 확인하나요?",
+    "answer": "응답에서 `resultCode`가 '0000'이면 발급 성공이며, `approveNo` 필드에 국세청 발행번호가 포함됩니다."
+  },
+  {
+    "id": 34,
+    "question": "현금영수증 취소 후에는 어떤 값이 반환되나요?",
+    "answer": "`resultCode`, `tid`, `cancelAmt`, `cancelledAt`, `approveNo` 등이 포함된 JSON 응답이 반환됩니다."
+  },
+  {
+    "id": 35,
+    "question": "현금영수증 조회 API는 어떤 정보를 반환하나요?",
+    "answer": "조회 결과로는 `tid`, `orderId`, `approveNo`, `cancelAmt`, `cancelledAt`, `signature` 등 다양한 정보를 포함합니다."
+  },
+  {
+    "id": 36,
+    "question": "빌키 발급 API는 어떤 역할을 하나요?",
+    "answer": "빌키 발급 API는 결제자의 카드정보를 암호화하여 저장하고, 반복 결제를 위한 고유 식별자인 빌키(BID)를 생성하는 기능을 합니다."
+  },
+  {
+    "id": 37,
+    "question": "빌키 발급 API 호출 예시는 어떻게 되나요?",
+    "answer": "curl -X POST 'https://api.nicepay.co.kr/v1/subscribe/regist' 명령어와 함께 Authorization 헤더 및 암호화된 결제정보(encData)를 포함한 JSON 바디로 호출합니다."
+  },
+  {
+    "id": 38,
+    "question": "빌키를 이용한 결제는 어떻게 수행되나요?",
+    "answer": "발급받은 BID(빌키)를 사용하여 `/v1/subscribe/{bid}/payments` API에 결제 정보를 POST로 전송하면 결제가 수행됩니다."
+  },
+  {
+    "id": 39,
+    "question": "빌키 삭제는 어떻게 하나요?",
+    "answer": "빌키 삭제를 위해 `/v1/subscribe/{bid}/expire` API를 호출하면 해당 BID가 삭제되며 이후 승인 처리가 불가능해집니다."
+  },
+  {
+    "id": 40,
+    "question": "NICEPAY 결제창 Server 승인 모델에서 클라이언트가 호출해야 하는 JavaScript 메서드는 무엇인가요?",
+    "answer": "`AUTHNICE.requestPay()` 메서드입니다. 이 메서드를 통해 결제자가 결제창을 통해 인증을 진행하며, 인증 결과는 returnUrl로 POST됩니다."
+  },
+  {
+    "id": 41,
+    "question": "Server 승인 모델에서 결제승인 API는 어떤 조건에서 호출해야 하나요?",
+    "answer": "`authResultCode`가 `0000`인 경우에만 결제승인 API를 호출해야 결제(승인)가 발생합니다. 그렇지 않으면 승인되지 않습니다."
+  },
+  {
+    "id": 42,
+    "question": "결제창 Server 승인 모델에서 필수 파라미터는 어떤 것들이 있나요?",
+    "answer": "`clientId`, `method`, `orderId`, `amount`, `goodsName`, `returnUrl`이 필수입니다."
+  },
+  {
+    "id": 43,
+    "question": "Server 승인 방식에서 위변조 검증 데이터인 `signature`는 어떻게 생성하나요?",
+    "answer": "`signature`는 `authToken + clientId + amount + SecretKey`를 sha256으로 해싱하여 hex 형식으로 생성합니다."
+  },
+  {
+    "id": 44,
+    "question": "결제창 요청 시 사용할 수 있는 결제 수단 종류에는 어떤 것들이 있나요?",
+    "answer": "card, bank, directCard, vbank, cellphone, naverpayCard, kakaopay, kakaopayCard, kakaopayMoney, samsungpayCard, payco, ssgpay, cardAndEasyPay 등이 있습니다."
+  },
+  {
+    "id": 45,
+    "question": "결제창에서 전달된 returnUrl은 어떤 역할을 하나요?",
+    "answer": "인증 및 결제(승인) 완료 후 결과를 POST 방식으로 가맹점 서버의 returnUrl로 전달하는 역할을 합니다."
+  },
+  {
+    "id": 46,
+    "question": "결제창 Server 승인 모델에서 승인 API 호출 시 사용할 수 있는 인증 방식은 무엇인가요?",
+    "answer": "Authorization 헤더에 `Basic <credentials>` 또는 `Bearer <token>` 방식이 사용됩니다."
+  },
+  {
+    "id": 47,
+    "question": "응답에서 `tid`는 어떤 역할을 하나요?",
+    "answer": "`tid`는 인증 또는 승인 성공 시 발급되는 거래 키로, 이후 승인 요청 또는 거래 추적에 사용됩니다."
+  },
+  {
+    "id": 48,
+    "question": "결제 승인 응답에서 `status` 값에는 어떤 상태가 있나요?",
+    "answer": "`paid`, `ready`, `failed`, `cancelled`, `partialCancelled`, `expired` 등이 있습니다."
+  },
+  {
+    "id": 49,
+    "question": "Server 승인 방식에서 클라이언트 키와 시크릿 키는 각각 어떤 용도로 사용되나요?",
+    "answer": "`클라이언트 키(clientId)`는 결제창 호출에 사용되며, `시크릿 키(SecretKey)`는 위변조 검증이나 Bearer token 생성에 사용됩니다."
+  },
+  {
+    "id": 50,
+    "question": "카드 이벤트 조회 API는 어떤 정보를 제공하나요?",
+    "answer": "카드 이벤트 조회 API는 기준금액에 해당하는 카드사별 무이자 할부 정보 및 포인트 결제 가능 여부 등을 제공합니다."
+  },
+  {
+    "id": 51,
+    "question": "카드 이벤트 API에서 기준금액이 5만원 이하인 경우 어떻게 되나요?",
+    "answer": "기준금액이 5만원 이하인 경우 무이자 정보는 제공되지 않습니다."
+  },
+  {
+    "id": 52,
+    "question": "카드 이벤트 정보를 조회하려면 어떤 URL을 호출해야 하나요?",
+    "answer": "`https://api.nicepay.co.kr/v1/card/event` URL에 GET 요청을 보내면 카드 이벤트 정보를 조회할 수 있습니다."
+  },
+  {
+    "id": 53,
+    "question": "카드 이벤트 API 요청 시 필수 파라미터는 무엇인가요?",
+    "answer": "`amount`, `useAuth`, `ediDate` 세 가지 파라미터는 필수입니다."
+  },
+  {
+    "id": 54,
+    "question": "응답에 포함된 interestFree 항목은 무엇을 의미하나요?",
+    "answer": "`interestFree`는 제공되는 모든 무이자 할부 정보를 담고 있으며, 카드사별 무이자 할부 개월 수를 포함합니다."
+  },
+  {
+    "id": 55,
+    "question": "카드 포인트 결제 가능 여부는 어떻게 확인하나요?",
+    "answer": "`cardPoint` 항목을 통해 포인트 결제가 가능한 카드사 코드를 확인할 수 있으며, 콜론(:)으로 구분된 코드 목록이 제공됩니다."
+  },
+  {
+    "id": 56,
+    "question": "카드 이벤트 API에서 위변조 방지를 위한 값은 무엇인가요?",
+    "answer": "`signData` 필드로 제공되며, `hex(sha256(ediDate + SecretKey))` 형식으로 생성됩니다."
+  },
+  {
+    "id": 57,
+    "question": "카드 이벤트 API 응답에서 resultCode가 의미하는 것은?",
+    "answer": "`resultCode`는 API 요청의 처리 결과를 나타내며, `0000`은 성공을 의미합니다."
+  },
+  {
+    "id": 58,
+    "question": "무이자 할부 카드 정보는 어떻게 조회하나요?",
+    "answer": "NICEPAY의 무이자 할부 정보는 `GET /v1/card/interest-free` API를 통해 조회할 수 있습니다. 요청 시 `useAuth`, `ediDate` 등의 파라미터를 포함하여 호출하며, 카드사별 무이자 할부 조건이 응답으로 제공됩니다."
+  },
+  {
+    "id": 59,
+    "question": "약관 조회 API는 어떤 경우에 사용하나요?",
+    "answer": "나이스페이 결제창을 사용하지 않는 경우, 사용자에게 필수 약관을 고지하기 위해 약관 조회 API를 사용합니다."
+  },
+  {
+    "id": 60,
+    "question": "약관 조회 API를 호출하려면 어떤 URL을 사용해야 하나요?",
+    "answer": "`https://api.nicepay.co.kr/v1/terms?termsType={약관유형}` 형식으로 GET 요청을 보내야 하며, 약관 유형은 필수 파라미터입니다."
+  },
+  {
+    "id": 61,
+    "question": "termsType 파라미터에 어떤 값을 넣을 수 있나요?",
+    "answer": "`ElectronicFinancialTransactions`, `CollectPersonalInfo`, `SharingPersonalInformation`, `TelecommunicationCharging` 중 하나를 선택하여 입력할 수 있습니다."
+  },
+  {
+    "id": 62,
+    "question": "약관 조회 응답에는 어떤 정보가 포함되나요?",
+    "answer": "`resultCode`, `resultMsg`, `termsTitle`, `content` 항목이 포함되며, 약관 제목과 본문 내용을 포함합니다."
+  },
+  {
+    "id": 63,
+    "question": "약관 응답의 인코딩을 지정할 수 있나요?",
+    "answer": "`returnCharSet` 파라미터를 통해 `utf-8`(기본값) 또는 `euc-kr`로 응답 인코딩을 지정할 수 있습니다."
+  },
+  {
+    "id": 64,
+    "question": "거래 조회 API는 언제 사용하나요?",
+    "answer": "결제 승인 요청 후 timeout 발생, 데이터 유실, 또는 위변조 의심 시 거래 조회 API를 사용하여 거래 정보를 확인할 수 있습니다."
+  },
+  {
+    "id": 65,
+    "question": "tid를 이용한 거래 조회 방법은?",
+    "answer": "`GET /v1/payments/{tid}` 엔드포인트에 Authorization 헤더와 함께 요청을 보내면 됩니다."
+  },
+  {
+    "id": 66,
+    "question": "orderId를 활용한 거래 조회 방법은?",
+    "answer": "`GET /v1/payments/find/{orderId}` 엔드포인트를 사용하며, 필수 파라미터로 `orderDate`가 필요합니다."
+  },
+  {
+    "id": 67,
+    "question": "거래 조회 응답에서 status 필드는 어떤 값을 가질 수 있나요?",
+    "answer": "status 필드는 'paid', 'ready', 'failed', 'cancelled', 'partialCancelled', 'expired' 중 하나의 값을 가집니다."
+  },
+  {
+    "id": 68,
+    "question": "현금영수증 정보는 어떤 경우에 응답되나요?",
+    "answer": "현금영수증 정보는 NaverPay 포인트, 가상계좌 입금건에서 제공되며, 부분 취소 시 여러 건이 존재할 수 있습니다."
+  },
+  {
+    "id": 69,
+    "question": "거래 조회 시 가상계좌 정보도 확인할 수 있나요?",
+    "answer": "네, 응답 객체 내 `vbank` 필드에서 입금받을 가상계좌 정보가 포함됩니다."
+  },
+  {
+    "id": 70,
+    "question": "응답에서 signData는 어떤 용도로 사용되나요?",
+    "answer": "`signData`는 위변조 방지를 위한 검증 데이터로, `hex(sha256(tid + ediDate + SecretKey))` 방식으로 생성됩니다."
+  },
+  {
+    "id": 71,
+    "question": "결제 승인 키(tid)는 어떤 경우에 사용되나요?",
+    "answer": "tid는 결제 승인에 성공한 거래의 고유 키로, 거래 조회 또는 취소 시 기준이 됩니다."
+  },
+  {
+    "id": 72,
+    "question": "balanceAmt는 어떤 값인가요?",
+    "answer": "`balanceAmt`는 전체 결제 금액에서 현재까지 취소된 금액을 뺀 후 남은 취소 가능 금액입니다."
+  },
+  {
+    "id": 73,
+    "question": "결제 수단은 어떤 값들이 응답되나요?",
+    "answer": "응답에서는 card, vbank, bank, cellphone, naverpay, kakaopay, samsungpay 등의 결제수단이 반환될 수 있습니다."
+  },
+  {
+    "id": 74,
+    "question": "웹훅 URL 등록 시 어떤 검증 절차가 필요한가요?",
+    "answer": "웹훅 URL 등록 시 NICEPAY는 해당 URL로 샘플 결제 통보를 보내고, URL이 'OK' 문자열을 응답하는지 확인하여 등록을 완료합니다."
+  },
+  {
+    "id": 75,
+    "question": "JS SDK에서 clientId는 어떤 역할을 하나요?",
+    "answer": "JS SDK를 통해 결제창 호출 시 `clientId` 필드에 클라이언트 키를 설정하면 인증이 완료됩니다. clientId에 따라 Server/Client 승인 방식이 결정됩니다."
+  },
+  {
+    "id": 76,
+    "question": "결제 승인 모델 중 Server 승인과 Client 승인의 차이점은?",
+    "answer": "Server 승인은 인증과 결제가 분리되어 있고, Client 승인은 인증 후 자동 결제가 이뤄집니다. Client 승인 시 승인금액 검증 API를 반드시 활용해야 합니다."
+  },
+  {
+    "id": 77,
+    "question": "JS SDK는 어떤 URL에서 로딩할 수 있나요?",
+    "answer": "https://pay.nicepay.co.kr/v1/js/ 스크립트를 통해 JS SDK를 로딩할 수 있습니다."
+  },
+  {
+    "id": 78,
+    "question": "Basic 인증 방식의 Authorization 헤더는 어떻게 구성되나요?",
+    "answer": "Authorization: Basic <Base64 인코딩된 client-key:secret-key> 형식으로 구성됩니다."
+  },
+  {
+    "id": 79,
+    "question": "Bearer token 인증을 위해 필요한 API는 무엇인가요?",
+    "answer": "Bearer token을 사용하려면 먼저 Access Token 발급 API (/v1/access-token)에 Basic 인증을 통해 호출해야 합니다."
+  },
+  {
+    "id": 80,
+    "question": "Access Token API는 어떻게 호출하나요?",
+    "answer": "curl -X POST \"https://api.nicepay.co.kr/v1/access-token\" 명령어와 함께 Content-Type 및 Authorization 헤더를 설정하여 호출합니다."
+  },
+  {
+    "id": 81,
+    "question": "Access Token은 얼마나 유효한가요?",
+    "answer": "Access Token은 발급 후 30분간 유효합니다. 갱신은 지원되지 않으며, 재요청 시 기존 토큰이 응답됩니다."
+  },
+  {
+    "id": 82,
+    "question": "JS SDK 인증을 위해 client-key는 어디서 확인하나요?",
+    "answer": "client-key는 가맹점 로그인 후 개발정보 탭에서 확인할 수 있습니다."
+  },
+  {
+    "id": 83,
+    "question": "API 인증에 사용되는 secret-key는 어디서 확인할 수 있나요?",
+    "answer": "secret-key는 가맹점 로그인 후 개발정보 탭에서 확인할 수 있으며, 보안상 필요한 경우 재발급 가능합니다."
+  },
+  {
+    "id": 84,
+    "question": "Server 인증과 Client 인증 클라이언트 키는 어떻게 다른가요?",
+    "answer": "Server 인증은 결제창 요청과 결제 API 호출이 분리된 모델이고, Client 인증은 결제창 요청 후 자동으로 결제까지 처리되는 모델입니다. 이에 따라 클라이언트 키 타입도 달라집니다."
+  },
+  {
+    "id": 85,
+    "question": "NICEPAY API를 사용하려면 어떻게 시작하나요?",
+    "answer": "회원가입 후 샌드박스를 활용하면 빠르게 개발을 시작할 수 있습니다. 회원가입은 [https://start.nicepay.co.kr/merchant/login/main.do](https://start.nicepay.co.kr/merchant/login/main.do)에서 할 수 있습니다."
+  },
+  {
+    "id": 86,
+    "question": "API KEY는 어디서 확인하나요?",
+    "answer": "상점 생성 후 '개발정보' 페이지에서 클라이언트 키와 시크릿 키를 확인할 수 있습니다."
+  },
+  {
+    "id": 87,
+    "question": "클라이언트 키와 시크릿 키는 어떤 용도로 사용되나요?",
+    "answer": "클라이언트 키는 결제창 호출에 사용되며, 시크릿 키는 API 호출 시 암호화 키로 사용됩니다."
+  },
+  {
+    "id": 88,
+    "question": "운영 상점과 샌드박스의 키는 같은가요?",
+    "answer": "아니요, 샌드박스에서 제공되는 키와 운영상점에서 제공되는 키는 다릅니다. 운영 시 반드시 운영상점의 키를 사용해야 합니다."
+  },
+  {
+    "id": 89,
+    "question": "방화벽 정책에 따라 허용해야 할 IP는 어떻게 되나요?",
+    "answer": "결제창, RESTful API, 웹훅에 대한 도메인과 공인 IP를 확인하고, 서버 방화벽에 OUTBOUND 또는 INBOUND로 허용해야 합니다."
+  },
+  {
+    "id": 90,
+    "question": "API 호출 시 IP 보안 기능을 설정할 수 있나요?",
+    "answer": "가능합니다. IP 등록은 CIDR 규칙을 따르며, 등록된 IP 대역만 API 호출이 가능하도록 설정할 수 있습니다."
+  },
+  {
+    "id": 91,
+    "question": "CIDR 규칙은 어떻게 활용하나요?",
+    "answer": "CIDR 표기법으로 IP 대역을 설정하며, 예를 들어 255.255.255.255는 /32로, 두 개의 IP 범위는 /31로 설정할 수 있습니다."
+  },
+  {
+    "id": 92,
+    "question": "NICEPAY API의 타임아웃 설정은 어떻게 되나요?",
+    "answer": "Connection timeout은 5초, Receive(Read) timeout은 30초입니다. Read-timeout 발생 시 반드시 망 취소를 요청해야 합니다."
+  },
+  {
+    "id": 93,
+    "question": "결제 개발 중 더 많은 정보를 어디서 확인할 수 있나요?",
+    "answer": "공통, 문서, 운영 탭을 통해 개발 준비, API 명세, 운영 팁 등을 확인할 수 있습니다."
+  },
+  {
+    "id": 94,
+    "question": "개발정보 탭에서 어떤 정보를 확인할 수 있나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 탭에서는 KEY 관리, IP 보안 설정, 웹훅 관리, 로그 확인 등 연동 개발에 필요한 설정 정보를 확인할 수 있습니다."
+  },
+  {
+    "id": 95,
+    "question": "Client-key와 Secret-key는 어떻게 발급하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > KEY 정보에서 결제창 승인 모델과 API 인가 방식을 선택한 뒤 키를 발급받을 수 있습니다. 최대 5개까지 생성할 수 있으며 재발급도 가능합니다."
+  },
+  {
+    "id": 96,
+    "question": "결제창 승인 방식에는 어떤 것이 있나요?",
+    "answer": "결제창 승인 방식은 Server 승인 모델(인증과 승인 분리)과 Client 승인 모델(인증과 승인이 결제창에서 동시에 처리) 두 가지가 있습니다."
+  },
+  {
+    "id": 97,
+    "question": "IP 보안 설정은 어떻게 하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > IP 보안에서 IP 제한 규칙을 CIDR 형식으로 등록할 수 있으며, 등록 후 IP TEST 버튼을 눌러 확인할 수 있습니다."
+  },
+  {
+    "id": 98,
+    "question": "웹훅은 어떤 시점에 발송되나요?",
+    "answer": "결제 승인, 가상계좌 발급, 입금 완료, 결제 취소 시 웹훅이 발송됩니다."
+  },
+  {
+    "id": 99,
+    "question": "웹훅 등록은 어떻게 하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > 웹훅 항목에서 End-point와 결제수단을 선택하여 등록하면 됩니다. 유효한 도메인이 필요하며 TEST 호출로 동작을 검증할 수 있습니다."
+  },
+  {
+    "id": 100,
+    "question": "웹훅 재전송은 어떻게 하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > 로그 상세보기 > 웹훅 탭에서 주문번호 검색 후 거래 선택 > 오른쪽 상단의 재전송 버튼을 클릭하여 진행할 수 있습니다."
+  },
+  {
+    "id": 101,
+    "question": "API 요청 로그는 어디에서 확인하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > 로그 항목에서 최근 API 호출 기록을 확인할 수 있으며, 상세보기를 통해 요청/응답 Body를 확인할 수 있습니다."
+  },
+  {
+    "id": 102,
+    "question": "개발정보 탭에서 어떤 정보를 확인할 수 있나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 탭에서는 KEY 관리, IP 보안 설정, 웹훅 관리, 로그 확인 등 연동 개발에 필요한 설정 정보를 확인할 수 있습니다."
+  },
+  {
+    "id": 103,
+    "question": "Client-key와 Secret-key는 어떻게 발급하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > KEY 정보에서 결제창 승인 모델과 API 인가 방식을 선택한 뒤 키를 발급받을 수 있습니다. 최대 5개까지 생성할 수 있으며 재발급도 가능합니다."
+  },
+  {
+    "id": 104,
+    "question": "결제창 승인 방식에는 어떤 것이 있나요?",
+    "answer": "결제창 승인 방식은 Server 승인 모델(인증과 승인 분리)과 Client 승인 모델(인증과 승인이 결제창에서 동시에 처리) 두 가지가 있습니다."
+  },
+  {
+    "id": 105,
+    "question": "IP 보안 설정은 어떻게 하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > IP 보안에서 IP 제한 규칙을 CIDR 형식으로 등록할 수 있으며, 등록 후 IP TEST 버튼을 눌러 확인할 수 있습니다."
+  },
+  {
+    "id": 106,
+    "question": "웹훅은 어떤 시점에 발송되나요?",
+    "answer": "결제 승인, 가상계좌 발급, 입금 완료, 결제 취소 시 웹훅이 발송됩니다."
+  },
+  {
+    "id": 107,
+    "question": "웹훅 등록은 어떻게 하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > 웹훅 항목에서 End-point와 결제수단을 선택하여 등록하면 됩니다. 유효한 도메인이 필요하며 TEST 호출로 동작을 검증할 수 있습니다."
+  },
+  {
+    "id": 108,
+    "question": "웹훅 재전송은 어떻게 하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > 로그 상세보기 > 웹훅 탭에서 주문번호 검색 후 거래 선택 > 오른쪽 상단의 재전송 버튼을 클릭하여 진행할 수 있습니다."
+  },
+  {
+    "id": 109,
+    "question": "API 요청 로그는 어디에서 확인하나요?",
+    "answer": "나이스페이(https://start.nicepay.co.kr/) 관리 화면 -> 개발정보 > 로그 항목에서 최근 API 호출 기록을 확인할 수 있으며, 상세보기를 통해 요청/응답 Body를 확인할 수 있습니다."
+  },
+  {
+    "id": 110,
+    "question": "HTTP 상태코드 200은 무엇을 의미하나요?",
+    "answer": "HTTP 상태코드 200은 요청이 정상적으로 처리되었음을 의미합니다 (OK)."
+  },
+  {
+    "id": 111,
+    "question": "HTTP 상태코드 401은 무엇을 의미하나요?",
+    "answer": "HTTP 상태코드 401은 SecretKey 또는 토큰이 없거나 인증에 실패했음을 의미합니다 (Unauthorized)."
+  },
+  {
+    "id": 112,
+    "question": "HTTP 상태코드 403은 무엇을 의미하나요?",
+    "answer": "HTTP 상태코드 403은 접근이 금지되었음을 의미합니다 (Forbidden)."
+  },
+  {
+    "id": 113,
+    "question": "HTTP 상태코드 404는 무엇을 의미하나요?",
+    "answer": "HTTP 상태코드 404는 요청한 리소스가 존재하지 않음을 의미합니다 (Not Found)."
+  },
+  {
+    "id": 114,
+    "question": "HTTP 상태코드 405는 무엇을 의미하나요?",
+    "answer": "HTTP 상태코드 405는 허용되지 않은 메소드로 요청했음을 의미합니다 (Method Not Allowed)."
+  },
+  {
+    "id": 115,
+    "question": "비씨 카드의 코드는 무엇인가요?",
+    "answer": "비씨 카드의 코드는 '01'입니다."
+  },
+  {
+    "id": 116,
+    "question": "KB국민 카드의 코드는 무엇인가요?",
+    "answer": "KB국민 카드의 코드는 '02'입니다."
+  },
+  {
+    "id": 117,
+    "question": "하나(외환) 카드의 코드는 무엇인가요?",
+    "answer": "하나(외환) 카드의 코드는 '03'입니다."
+  },
+  {
+    "id": 118,
+    "question": "삼성카드의 코드는 무엇인가요?",
+    "answer": "삼성카드의 코드는 '04'입니다."
+  },
+  {
+    "id": 119,
+    "question": "신한카드의 코드는 무엇인가요?",
+    "answer": "신한카드의 코드는 '06'입니다."
+  },
+  {
+    "id": 120,
+    "question": "현대카드의 코드는 무엇인가요?",
+    "answer": "현대카드의 코드는 '07'입니다."
+  },
+  {
+    "id": 121,
+    "question": "롯데카드의 코드는 무엇인가요?",
+    "answer": "롯데카드의 코드는 '08'입니다."
+  },
+  {
+    "id": 122,
+    "question": "씨티카드의 코드는 무엇인가요?",
+    "answer": "씨티카드의 코드는 '11'입니다."
+  },
+  {
+    "id": 123,
+    "question": "NH채움카드의 코드는 무엇인가요?",
+    "answer": "NH채움카드의 코드는 '12'입니다."
+  },
+  {
+    "id": 124,
+    "question": "수협카드의 코드는 무엇인가요?",
+    "answer": "수협카드의 코드는 '13'입니다."
+  },
+  {
+    "id": 125,
+    "question": "신협카드의 코드는 무엇인가요?",
+    "answer": "신협카드의 코드는 '14'입니다."
+  },
+  {
+    "id": 126,
+    "question": "우리카드의 코드는 무엇인가요?",
+    "answer": "우리카드의 코드는 '15'입니다."
+  },
+  {
+    "id": 127,
+    "question": "하나 SK카드의 코드는 무엇인가요?",
+    "answer": "하나 SK카드의 코드는 '16'입니다."
+  },
+  {
+    "id": 128,
+    "question": "광주카드의 코드는 무엇인가요?",
+    "answer": "광주카드의 코드는 '21'입니다."
+  },
+  {
+    "id": 129,
+    "question": "전북카드의 코드는 무엇인가요?",
+    "answer": "전북카드의 코드는 '22'입니다."
+  },
+  {
+    "id": 130,
+    "question": "제주카드의 코드는 무엇인가요?",
+    "answer": "제주카드의 코드는 '23'입니다."
+  },
+  {
+    "id": 131,
+    "question": "산은캐피탈 카드의 코드는 무엇인가요?",
+    "answer": "산은캐피탈 카드의 코드는 '24'입니다."
+  },
+  {
+    "id": 132,
+    "question": "해외비자 카드의 코드는 무엇인가요?",
+    "answer": "해외비자 카드의 코드는 '25'입니다."
+  },
+  {
+    "id": 133,
+    "question": "해외마스터 카드의 코드는 무엇인가요?",
+    "answer": "해외마스터 카드의 코드는 '26'입니다."
+  },
+  {
+    "id": 134,
+    "question": "해외다이너스 카드의 코드는 무엇인가요?",
+    "answer": "해외다이너스 카드의 코드는 '27'입니다."
+  },
+  {
+    "id": 135,
+    "question": "해외AMX 카드의 코드는 무엇인가요?",
+    "answer": "해외AMX 카드의 코드는 '28'입니다."
+  },
+  {
+    "id": 136,
+    "question": "해외JCB 카드의 코드는 무엇인가요?",
+    "answer": "해외JCB 카드의 코드는 '29'입니다."
+  },
+  {
+    "id": 137,
+    "question": "우체국 카드의 코드는 무엇인가요?",
+    "answer": "우체국 카드의 코드는 '32'입니다."
+  },
+  {
+    "id": 138,
+    "question": "저축은행 카드의 코드는 무엇인가요?",
+    "answer": "저축은행 카드의 코드는 '33'입니다."
+  },
+  {
+    "id": 139,
+    "question": "은련(UnionPay) 카드의 코드는 무엇인가요?",
+    "answer": "은련(UnionPay) 카드의 코드는 '34'입니다."
+  },
+  {
+    "id": 140,
+    "question": "새마을금고 카드의 코드는 무엇인가요?",
+    "answer": "새마을금고 카드의 코드는 '35'입니다."
+  },
+  {
+    "id": 141,
+    "question": "KDB산업은행 카드의 코드는 무엇인가요?",
+    "answer": "KDB산업은행 카드의 코드는 '36'입니다."
+  },
+  {
+    "id": 142,
+    "question": "카카오뱅크 카드의 코드는 무엇인가요?",
+    "answer": "카카오뱅크 카드의 코드는 '37'입니다."
+  },
+  {
+    "id": 143,
+    "question": "케이뱅크 카드의 코드는 무엇인가요?",
+    "answer": "케이뱅크 카드의 코드는 '38'입니다."
+  },
+  {
+    "id": 144,
+    "question": "페이코포인트의 코드는 무엇인가요?",
+    "answer": "페이코포인트의 코드는 '39'입니다."
+  },
+  {
+    "id": 145,
+    "question": "카카오머니의 코드는 무엇인가요?",
+    "answer": "카카오머니의 코드는 '40'입니다."
+  },
+  {
+    "id": 146,
+    "question": "SSG머니의 코드는 무엇인가요?",
+    "answer": "SSG머니의 코드는 '41'입니다."
+  },
+  {
+    "id": 147,
+    "question": "네이버포인트의 코드는 무엇인가요?",
+    "answer": "네이버포인트의 코드는 '42'입니다."
+  },
+  {
+    "id": 148,
+    "question": "한국은행의 은행 코드는 무엇인가요?",
+    "answer": "한국은행의 은행 코드는 '001'입니다."
+  },
+  {
+    "id": 149,
+    "question": "산업은행의 은행 코드는 무엇인가요?",
+    "answer": "산업은행의 은행 코드는 '002'입니다."
+  },
+  {
+    "id": 150,
+    "question": "기업은행의 은행 코드는 무엇인가요?",
+    "answer": "기업은행의 은행 코드는 '003'입니다."
+  },
+  {
+    "id": 151,
+    "question": "국민은행의 은행 코드는 무엇인가요?",
+    "answer": "국민은행의 은행 코드는 '004'입니다."
+  },
+  {
+    "id": 152,
+    "question": "외환은행의 은행 코드는 무엇인가요?",
+    "answer": "외환은행의 은행 코드는 '005'입니다."
+  },
+  {
+    "id": 153,
+    "question": "수협중앙회의 은행 코드는 무엇인가요?",
+    "answer": "수협중앙회의 은행 코드는 '007'입니다."
+  },
+  {
+    "id": 154,
+    "question": "수출입은행의 은행 코드는 무엇인가요?",
+    "answer": "수출입은행의 은행 코드는 '008'입니다."
+  },
+  {
+    "id": 155,
+    "question": "농협중앙회의 은행 코드는 무엇인가요?",
+    "answer": "농협중앙회의 은행 코드는 '011'입니다."
+  },
+  {
+    "id": 156,
+    "question": "농협회원조합의 은행 코드는 무엇인가요?",
+    "answer": "농협회원조합의 은행 코드는 '012'입니다."
+  },
+  {
+    "id": 157,
+    "question": "우리은행의 은행 코드는 무엇인가요?",
+    "answer": "우리은행의 은행 코드는 '020'입니다."
+  },
+  {
+    "id": 158,
+    "question": "SC은행의 은행 코드는 무엇인가요?",
+    "answer": "SC은행의 은행 코드는 '023'입니다."
+  },
+  {
+    "id": 159,
+    "question": "서울은행의 은행 코드는 무엇인가요?",
+    "answer": "서울은행의 은행 코드는 '026'입니다."
+  },
+  {
+    "id": 160,
+    "question": "한국씨티은행의 은행 코드는 무엇인가요?",
+    "answer": "한국씨티은행의 은행 코드는 '027'입니다."
+  },
+  {
+    "id": 161,
+    "question": "대구은행의 은행 코드는 무엇인가요?",
+    "answer": "대구은행의 은행 코드는 '031'입니다."
+  },
+  {
+    "id": 162,
+    "question": "부산은행의 은행 코드는 무엇인가요?",
+    "answer": "부산은행의 은행 코드는 '032'입니다."
+  },
+  {
+    "id": 163,
+    "question": "광주은행의 은행 코드는 무엇인가요?",
+    "answer": "광주은행의 은행 코드는 '034'입니다."
+  },
+  {
+    "id": 164,
+    "question": "제주은행의 은행 코드는 무엇인가요?",
+    "answer": "제주은행의 은행 코드는 '035'입니다."
+  },
+  {
+    "id": 165,
+    "question": "전북은행의 은행 코드는 무엇인가요?",
+    "answer": "전북은행의 은행 코드는 '037'입니다."
+  },
+  {
+    "id": 166,
+    "question": "경남은행의 은행 코드는 무엇인가요?",
+    "answer": "경남은행의 은행 코드는 '039'입니다."
+  },
+  {
+    "id": 167,
+    "question": "새마을금고연합회의 은행 코드는 무엇인가요?",
+    "answer": "새마을금고연합회의 은행 코드는 '045'입니다."
+  },
+  {
+    "id": 168,
+    "question": "신협중앙회의 은행 코드는 무엇인가요?",
+    "answer": "신협중앙회의 은행 코드는 '048'입니다."
+  },
+  {
+    "id": 169,
+    "question": "상호저축은행의 은행 코드는 무엇인가요?",
+    "answer": "상호저축은행의 은행 코드는 '050'입니다."
+  },
+  {
+    "id": 170,
+    "question": "정보통신부 우체국의 은행 코드는 무엇인가요?",
+    "answer": "정보통신부 우체국의 은행 코드는 '071'입니다."
+  },
+  {
+    "id": 171,
+    "question": "하나은행의 은행 코드는 무엇인가요?",
+    "answer": "하나은행의 은행 코드는 '081'입니다."
+  },
+  {
+    "id": 172,
+    "question": "신한은행의 은행 코드는 무엇인가요?",
+    "answer": "신한은행의 은행 코드는 '088'입니다."
+  },
+  {
+    "id": 173,
+    "question": "케이뱅크의 은행 코드는 무엇인가요?",
+    "answer": "케이뱅크의 은행 코드는 '089'입니다."
+  },
+  {
+    "id": 174,
+    "question": "카카오뱅크의 은행 코드는 무엇인가요?",
+    "answer": "카카오뱅크의 은행 코드는 '090'입니다."
+  },
+  {
+    "id": 175,
+    "question": "API 응답코드 '3001'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '3001'은 '카드 결제 성공'을 의미합니다."
+  },
+  {
+    "id": 176,
+    "question": "API 응답코드 '3011'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '3011'은 '카드번호 오류'를 의미합니다."
+  },
+  {
+    "id": 177,
+    "question": "API 응답코드 '3012'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '3012'은 '카드가맹점 정보 미확인'을 의미합니다."
+  },
+  {
+    "id": 178,
+    "question": "API 응답코드 '3013'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '3013'은 '카드 가맹점 개시 안됨'을 의미합니다."
+  },
+  {
+    "id": 179,
+    "question": "API 응답코드 '4000'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '4000'은 '계좌이체 결제 성공'을 의미합니다."
+  },
+  {
+    "id": 180,
+    "question": "API 응답코드 '4100'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '4100'은 '가상계좌 발급 성공'을 의미합니다."
+  },
+  {
+    "id": 181,
+    "question": "API 응답코드 '7001'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '7001'은 '현금영수증 처리 성공'을 의미합니다."
+  },
+  {
+    "id": 182,
+    "question": "API 응답코드 'A000'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'A000'은 '휴대폰결제 처리 성공'을 의미합니다."
+  },
+  {
+    "id": 183,
+    "question": "API 응답코드 '0000'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '0000'은 '결제성공'을 의미합니다."
+  },
+  {
+    "id": 184,
+    "question": "API 응답코드 '2001'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 '2001'은 '취소 성공'을 의미합니다."
+  },
+  {
+    "id": 185,
+    "question": "API 응답코드 'F100'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'F100'은 '빌키가 정상적으로 생성되었습니다.'를 의미합니다."
+  },
+  {
+    "id": 186,
+    "question": "API 응답코드 'C000'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'C000'은 '에스크로배송등록 성공'을 의미합니다."
+  },
+  {
+    "id": 187,
+    "question": "API 응답코드 'D000'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'D000'은 '에스크로구매결정 성공'을 의미합니다."
+  },
+  {
+    "id": 188,
+    "question": "API 응답코드 'E000'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'E000'은 '에스크로구매거절 성공'을 의미합니다."
+  },
+  {
+    "id": 189,
+    "question": "API 응답코드 'P015'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'P015'은 'orderid가 이미 존재합니다.'를 의미합니다."
+  },
+  {
+    "id": 190,
+    "question": "API 응답코드 'U112'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'U112'은 '이미 사용된 OrderId 입니다.'를 의미합니다."
+  },
+  {
+    "id": 191,
+    "question": "API 응답코드 'S999'은 무엇을 의미하나요?",
+    "answer": "API 응답코드 'S999'은 '기타오류가 발생하였습니다.'를 의미합니다."
+  }
+]

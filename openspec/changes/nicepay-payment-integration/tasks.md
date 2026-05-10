@@ -110,7 +110,7 @@
   - Cron: renewal success, retry escalation, grace expiry
   - Cancel/uncancel UX
 - [ ] 11.3 NICE console: register webhook URL `https://usesplash.vercel.app/api/webhooks/nicepay` and confirm dummy delivery succeeds.
-- [ ] 11.4 Vercel: register cron, set test-mode env vars, deploy preview, run sandbox QA on preview.
+- [x] 11.4 Vercel: register cron, set test-mode env vars (3 environments), deploy production. Smoke-tested `/pricing` (200), `/account/payments` (200), `/api/cron/billing` (401 unauth / 200 with bearer / `processed:{renewed:0,failed:0,downgraded:0}`), `/api/webhooks/nicepay` (POST invalid_json → 400). Production URL: https://splash.ai.kr (alias of https://usesplash.vercel.app).
 - [ ] 11.5 Production canary: switch `NICEPAY_MODE=live` for a single internal account, perform 1 real Pro payment, confirm DB state and receipt, then immediately refund.
 - [ ] 11.6 Flip `NEXT_PUBLIC_PAYMENTS_ENABLED=true` in production after canary success.
 - [x] 11.7 Run `openspec validate nicepay-payment-integration --strict` — passes.

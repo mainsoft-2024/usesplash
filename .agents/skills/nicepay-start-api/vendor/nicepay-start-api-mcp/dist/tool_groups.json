@@ -1,0 +1,264 @@
+[
+  {
+    "name": "결제",
+    "description": "create_payment_window: [1단계: 클라이언트] NICEPAY JS SDK 기반 결제창 호출 코드 생성 / approve_payment: [2단계: 서버] 결제 승인을 위한 API 호출 정보 제공 / cancel_payment: [3단계: 서버] 결제 취소 위한 API 호출 정보 제공",
+    "methods": [
+      {
+        "name": "create_payment_window",
+        "description": "[1단계: 클라이언트] NICEPAY JS SDK 기반 결제창 호출 코드 생성",
+        "isClient": true,
+        "parameters": {
+          "clientId": "(필수) 가맹점 식별코드로, NICEPAY에서 발급한 고유 값",
+          "method": "(필수) 사용할 결제수단을 지정 예: 'card', 'vbank', 'kakaopay'",
+          "orderId": "(필수) 가맹점에서 관리하는 유니크한 주문번호. 이미 결제된 주문번호 재사용 불가",
+          "amount": "(필수) 결제할 총 금액. 숫자만 입력",
+          "goodsName": "(필수) 결제창에 표시될 상품명. '\"'와 '¦' 특수문자는 '-'로 자동 대체됨",
+          "returnUrl": "(필수) 결제 인증 완료 후, NICEPAY가 결과 전달할 가맹점 서버 URL",
+          "mallReserved": "상점 추가 정보 전달하는 예비 필드. returnUrl로 함께 반환되며, JSON 문자열 형식 사용을 권장",
+          "mallUserId": "상점에서 관리하는 사용자 ID",
+          "buyerName": "구매자 실명",
+          "buyerTel": "구매자 연락처 하이픈(-) 없이 숫자만 입력",
+          "buyerEmail": "구매자 이메일 주소",
+          "useEscrow": "에스크로 거래 여부 설정 (true: 에스크로, false: 일반거래)",
+          "currency": "결제 통화 단위 설정 (KRW, USD, CNY)",
+          "logoImgUrl": "결제창 상단 가맹점 로고 이미지 전체 URL",
+          "language": "결제창 언어 설정 (KO, EN, CN)",
+          "returnCharSet": "returnUrl로 전달될 파라미터 인코딩 방식 (utf-8, euc-kr)",
+          "skinType": "결제창 스킨 색상을 설정 (red, green, purple, gray, dark)",
+          "taxFreeAmt": "결제 금액(amount) 중 면세에 해당하는 금액을 설정",
+          "cardQuota": "사용 가능한 할부개월을 제한 콤마(,)로 구분하며, 일시불은 '00'으로 설정 (예: '00,03,06')",
+          "cardCode": "결제창에 노출할 특정 카드사 코드로 제한 콤마(,)로 구분 (예: '04,06')",
+          "cardShowOpt": "카드사별 인증창 호출방식을 직접 지정 (예: '08:3¦02:3')",
+          "vbankHolder": "가상계좌 발급 시 입금주로 표시될 이름 (가상계좌 결제 시 필수)",
+          "vbankValidHours": "가상계좌 입금 유효시간을 시간 단위로 설정",
+          "vbankExpDate": "가상계좌 입금 만료일을 'YYYYMMDDhhmm' 형식으로 직접 지정",
+          "isDigital": "휴대폰 결제 상품 유형을 설정 (true: 컨텐츠, false: 실물)",
+          "directReceiptType": "현금영수증 발급 유형을 지정 (unPublished, individual, company)",
+          "directReceiptNo": "현금영수증 발행 대상 식별정보(휴대폰 또는 사업자번호). '-'없이 숫자만 입력",
+          "disableScroll": "결제창 스크롤 생성 여부 설정 (기본값: true, 스크롤 없음)",
+          "disableEdgeChk": "Edge 브라우저 사용 시 안내 팝업 노출 여부 설정 (기본값: false, 노출)",
+          "zIdxHigher": "결제창 레이어 z-index 11000으로 상향 조정",
+          "appScheme": "모바일 앱 결제 후 다시 앱으로 돌아오기 위한 App Scheme 값을 설정"
+        },
+        "jsSdk": {
+          "scriptUrl": "https://pay.nicepay.co.kr/v1/js/",
+          "globalMethod": "AUTHNICE.requestPay",
+          "requiredCallbacks": [
+            {
+              "name": "fnError",
+              "description": "결제 실패 또는 취소 시 반드시 호출되는 콜백 함수"
+            }
+          ]
+        },
+        "template": "<!DOCTYPE html>\n<html>\n<head>\n  <title>NICEPAY 결제 요청</title>\n  <script src=\"https://pay.nicepay.co.kr/v1/js/\"></script>\n</head>\n<body>\n  <button onclick=\"requestPay()\">결제하기</button>\n  <script>\n    function requestPay() {\n      AUTHNICE.requestPay({\n        clientId: \"YOUR_CLIENT_ID\",\n        method: \"card\",\n        orderId: \"ORDER123456\",\n        amount: 10000,\n        goodsName: \"샘플 상품\",\n        returnUrl: \"https://your.site.com/payment/result\",\n        fnError: function (result) {\n          alert(result.errorMsg);\n        }\n      });\n    }\n  </script>\n</body>\n</html>\n"
+      },
+      {
+        "name": "approve_payment",
+        "description": "[2단계: 서버] 결제 승인을 위한 API 호출 정보 제공",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "tid": "[1단계]에서 발급된 고유 거래 ID",
+          "amount": "(필수) 결제금액, 최대 12바이트",
+          "ediDate": "(옵션) 전문생성일시 ISO 8601 형식 (예: 2025-06-30T21:00:00+09:00).",
+          "signData": "(옵션) 위변조 검증 데이터 생성규칙: hex(sha256(tid + amount + ediDate + SecretKey)).",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식. (기본값: utf-8)"
+        }
+      },
+      {
+        "name": "cancel_payment",
+        "description": "[3단계: 서버] 결제 취소 위한 API 호출 정보 제공",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "tid": "취소할 원거래 거래 ID",
+          "reason": "(옵션) 취소 사유",
+          "orderId": "(옵션) 상점 거래 고유번호. 부분 취소 시에는 중복된 orderId로 재호 불가",
+          "cancelAmt": "(옵션) 부분 취소 요청 금액. 값이 없으면 전액 취소 처리",
+          "mallReserved": "(옵션) 상점 정보 전달용 예비 필드",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(tid + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)",
+          "taxFreeAmt": "(옵션) 취소 금액 중 면세 공급가액",
+          "refundAccount": "(옵션) 환불 계좌번호",
+          "refundBankCode": "(옵션) 환불 계좌 은행코드",
+          "refundHolder": "(옵션) 환불 계좌 예금주명"
+        }
+      }
+    ]
+  },
+  {
+    "name": "정기결제",
+    "description": "create_billing_key: [서버] 빌링키(정기결제 키) 발급을 위한 암호화 요청 정보 반환 / approve_billing_payment: [서버] 발급된 빌링키로 결제 승인 / expire_billing_key: [서버] 발급된 빌링키 삭제(만료)",
+    "methods": [
+      {
+        "name": "create_billing_key",
+        "description": "[서버] 빌링키(정기결제 키) 발급을 위한 암호화 요청 정보 반환",
+        "isClient": true,
+        "parameters": {
+          "encData": "(필수) 결제정보 암호화한 데이터\n**암호화 방식 (encMode: 'A2' 기준):**\n- **알고리즘**: AES-256-CBC\n- **KEY**: 가맹점 SecretKey (32byte)\n- **IV**: 가맹점 SecretKey 앞 16자리\n- **Padding**: PKCS5\n- **결과 인코딩**: Hex\n**평문(Plain Text) 형식:**\n`cardNo=값&expYear=YY&expMonth=MM&idNo=값&cardPw=값`\n(상세 내용은 BillingKeyData 스키마 참조)\n",
+          "orderId": "(필수) 가맹점에서 관리하는 유니크한 주문번호",
+          "buyerName": "(옵션) 구매자 이름",
+          "buyerEmail": "(옵션) 구매자 이메일 주소",
+          "buyerTel": "(옵션) 구매자 전화번호 ('-' 없이 숫자만)",
+          "encMode": "(옵션) 암호화 모드. 'A2'는 AES256 의미",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)"
+        }
+      },
+      {
+        "name": "approve_billing_payment",
+        "description": "[서버] 발급된 빌링키로 결제 승인",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "bid": "이전에 발급받은 고유한 빌링키",
+          "orderId": "(필수) 가맹점에서 관리하는 유니크한 주문번호. 결제된 주문번호로는 재호출 불가",
+          "amount": "(필수) 결제할 금액. 최대 12바이트",
+          "goodsName": "(필수) 상품명",
+          "cardQuota": "(필수) 할부개월 0:일시불, 2:2개월...",
+          "useShopInterest": "(필수) 상점분담무이자 사용 여부 (현재 false만 사용 가능)",
+          "buyerName": "(옵션) 구매자 이름",
+          "buyerTel": "(옵션) 구매자 전화번호 ('-' 없이 숫자만)",
+          "buyerEmail": "(옵션) 구매자 이메일",
+          "taxFreeAmt": "(옵션) 면세 공급가액. 전체 거래금액 중 면세 금액을 설정",
+          "mallReserved": "(옵션) 상점 정보 전달용 예비 필드",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + bid + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)"
+        }
+      },
+      {
+        "name": "expire_billing_key",
+        "description": "[서버] 발급된 빌링키 삭제(만료)",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "bid": "삭제(만료)할 고유한 빌링키",
+          "orderId": "(옵션) 상점 거래 고유번호",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + bid + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)"
+        }
+      }
+    ]
+  },
+  {
+    "name": "영수증",
+    "description": "create_cash_receipt: [서버] 현금영수증을 발급 / cancel_cash_receipt: [서버] 발급된 현금영수증을 취소 / get_cash_receipt_status: [조회] 발급된 현금영수증 처리 상태 조회",
+    "methods": [
+      {
+        "name": "create_cash_receipt",
+        "description": "[서버] 현금영수증을 발급",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "orderId": "(필수) 상점 거래 고유번호",
+          "amount": "(필수) 현금영수증 발행 금액 (최대 12바이트)",
+          "goodsName": "(필수) 상품명",
+          "receiptType": "(필수) 현금영수증 발급 유형",
+          "receiptNo": "(필수) 현금영수증 발행대상 식별정보 (휴대폰번호 또는 사업자번호)",
+          "supplyAmt": "(옵션) 공급가액 (최대 12바이트)",
+          "goodsVat": "(옵션) 부가가치세 (최대 12바이트)",
+          "taxFreeAmt": "(옵션) 면세공급가액 (최대 12바이트)",
+          "serviceAmt": "(옵션) 봉사료 (최대 12바이트)",
+          "buyerName": "(옵션) 구매자 이름",
+          "buyerTel": "(옵션) 구매자 전화번호 ('-' 없이)",
+          "buyerEmail": "(옵션) 구매자 이메일",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(orderId + amount + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)"
+        }
+      },
+      {
+        "name": "cancel_cash_receipt",
+        "description": "[서버] 발급된 현금영수증을 취소",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "tid": "취소할 원 현금영수증 거래 거래 ID",
+          "orderId": "(옵션) 상점 거래 고유번호",
+          "reason": "(옵션) 취소 사유",
+          "cancelAmt": "(옵션) 부분 취소 요청 금액. 값이 없으면 전액 취소로 처리 부분 취소 시 하위 금액 필드(supplyAmt 등)는 필수",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터 생성규칙: hex(sha256(tid + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식 (기본값: utf-8)",
+          "supplyAmt": "(부분 취소 시 필수) 취소 금액 중 공급가액",
+          "goodsVat": "(부분 취소 시 필수) 취소 금액 중 부가가치세",
+          "taxFreeAmt": "(부분 취소 시 필수) 취소 금액 중 면세 공급가액",
+          "serviceAmt": "(부분 취소 시 필수) 취소 금액 중 봉사료"
+        }
+      },
+      {
+        "name": "get_cash_receipt_status",
+        "description": "[조회] 발급된 현금영수증 처리 상태 조회",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "tid": "조회할 원 현금영수증 거래 거래 ID",
+          "orderDate": "(옵션) 주문일자 (YYYYMMDD 형식)",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(tid + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식"
+        }
+      }
+    ]
+  },
+  {
+    "name": "조회",
+    "description": "find_payment_by_order_id: [거래 조회] 주문번호 사용하여 거래 내역을 조회 / get_terms: [조회] NICEPAY 약관 내용 조회 / get_card_promotions: [조회] 카드 이벤트(포인트, 무이자) 정보 조회 / list_interest_free_installments: [조회] 카드 무이자 할부 정보 조회",
+    "methods": [
+      {
+        "name": "find_payment_by_order_id",
+        "description": "[거래 조회] 주문번호 사용하여 거래 내역을 조회",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "orderId": "조회할 거래 가맹점 주문번호",
+          "orderDate": "(옵션) 주문일자 (YYYYMMDD 형식)",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(tid + ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식"
+        }
+      },
+      {
+        "name": "get_terms",
+        "description": "[조회] NICEPAY 약관 내용 조회",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "termsType": "(필수) 조회할 약관 유형을 지정합니다.\n- `ElectronicFinancialTransactions`: 전자금융거래 약관\n- `CollectPersonalInfo`: 개인정보 수집 및 이용 약관\n- `SharingPersonalInformation`: 개인정보 제 3자 제공약관\n- `TelecommunicationCharging`: 통신과금서비스 이용약관\n",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식"
+        }
+      },
+      {
+        "name": "get_card_promotions",
+        "description": "[조회] 카드 이벤트(포인트, 무이자) 정보 조회",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "amount": "(옵션) 기준 금액. 이 금액에 해당하는 카드 이벤트 정보 제공 최대 12바이트",
+          "useAuth": "(옵션) 인증 거래 여부 (true: 인증, false: 비인증/빌링)",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "mid": "(옵션) 상점 MID. 일반적으로 사용하지 않으나, 요청 시 최우선으로 적용",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식"
+        }
+      },
+      {
+        "name": "list_interest_free_installments",
+        "description": "[조회] 카드 무이자 할부 정보 조회",
+        "isClient": false,
+        "parameters": {
+          "basicAuthToken": "Base64 encoded clientId:secretKey",
+          "useAuth": "(옵션) 인증 거래 여부 (true: 인증, false: 비인증/빌링)",
+          "ediDate": "(옵션) 전문생성일시 (ISO 8601 형식)",
+          "mid": "(옵션) 상점 MID. 일반적으로 사용하지 않으나, 요청 시 최우선으로 적용",
+          "signData": "(옵션) 위변조 검증 데이터. 생성규칙: hex(sha256(ediDate + SecretKey))",
+          "returnCharSet": "(옵션) 응답 파라미터 인코딩 방식"
+        }
+      }
+    ]
+  }
+]

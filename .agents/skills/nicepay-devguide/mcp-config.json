@@ -1,0 +1,5 @@
+{
+  "name": "nicepay_devguide",
+  "command": "node",
+  "args": ["./launch-devguide.cjs"]
+}

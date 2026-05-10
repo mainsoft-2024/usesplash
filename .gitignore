@@ -44,3 +44,12 @@ next-env.d.ts
 src/generated/
 .env*.local
 .osgrep
+
+# nested package builds & deps
+packages/*/node_modules
+packages/*/dist
+**/node_modules/
+packages/*/dist
+
+# slash runtime state (per-machine)
+.slash/session.json
