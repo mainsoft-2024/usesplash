@@ -20,8 +20,24 @@ export function approve(input: { tid: string; amount: number; ediDate?: string }
     body: { amount: input.amount, ediDate, signData, returnCharSet: "utf-8" },
   });
 }
-/** POST /v1/payments/{tid}/cancel. */
-export function cancel(input: { tid: string; opts: Record<string, unknown> }) {
+/**
+ * POST /v1/payments/{tid}/cancel — 전액 또는 부분 취소.
+ * orderId는 필수 (누락 시 U100). 전액취소엔 원거래 orderId, 부분취소엔 새로 채번된 고유 orderId.
+ */
+export function cancel(input: {
+  tid: string;
+  opts: {
+    orderId: string;
+    reason: string;
+    cancelAmt?: number;
+    taxFreeAmt?: number;
+    refundAccount?: string;
+    refundBankCode?: string;
+    refundHolder?: string;
+    isNetCancel?: "1";
+    mallReserved?: string;
+  };
+}) {
   const cfg = getNicepayConfig();
   const ediDate = kstIso();
   const signData = signCancel({ tid: input.tid, ediDate, secretKey: cfg.secretKey });

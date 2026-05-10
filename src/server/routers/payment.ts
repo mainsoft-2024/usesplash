@@ -102,7 +102,11 @@ export const paymentRouter = router({
       const usageCount = await ctx.prisma.usageLog.count({ where: { userId: ctx.session.user.id, createdAt: { gte: payment.createdAt } } });
       if (usageCount > 0) throw new TRPCError({ code: "BAD_REQUEST" });
 
-      const canceled = await nicepay.payments.cancel({ tid: payment.providerPaymentId, opts: { reason: "사용자 요청 환불" } });
+      // 전액 취소: NICE는 orderId 필수 (원거래 orderId 재사용). 누락하면 U100.
+      const canceled = await nicepay.payments.cancel({
+        tid: payment.providerPaymentId,
+        opts: { orderId: payment.orderId, reason: "사용자 요청 환불" },
+      });
       await recordPaymentResult({
         subscriptionId: payment.subscriptionId,
         paymentResult: {
@@ -131,7 +135,12 @@ export const paymentRouter = router({
       const payment = await ctx.prisma.payment.findUnique({ where: { id: input.paymentId } });
       if (!payment) throw new TRPCError({ code: "NOT_FOUND" });
       if (!payment.providerPaymentId) throw new TRPCError({ code: "BAD_REQUEST" });
-      const canceled = await nicepay.payments.cancel({ tid: payment.providerPaymentId, opts: { reason: input.reason, cancelAmt: input.amount } });
+      // 부분 취소: NICE는 새 orderId를 요구 (각 부분취소건이 고유 거래)
+      const partialOrderId = nicepay.generateOrderId(payment.userId);
+      const canceled = await nicepay.payments.cancel({
+        tid: payment.providerPaymentId,
+        opts: { orderId: partialOrderId, reason: input.reason, cancelAmt: input.amount },
+      });
       await recordPaymentResult({
         subscriptionId: payment.subscriptionId,
         paymentResult: { orderId: payment.orderId, providerPaymentId: canceled.tid, providerTransactionId: canceled.tid, paid: false, amount: -Math.abs(input.amount), currency: "KRW", paymentMethod: "card", paymentType: "one_shot", raw: { refunded: true } },
